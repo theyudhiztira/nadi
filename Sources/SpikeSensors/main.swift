@@ -17,7 +17,7 @@ func hidTemperatures() {
     }
     var readings: [(String, Double)] = []
     for service in services {
-        let ref = unsafeBitCast(service, to: IOHIDServiceClientRef.self)
+        let ref = unsafeDowncast(service, to: IOHIDServiceClient.self)
         let name = IOHIDServiceClientCopyProperty(ref, "Product" as CFString) as? String ?? "?"
         guard let event = IOHIDServiceClientCopyEvent(ref, Int64(kIOHIDEventTypeTemperature), 0, 0) else { continue }
         let celsius = IOHIDEventGetFloatValue(event, Int32(kIOHIDEventTypeTemperature << 16))

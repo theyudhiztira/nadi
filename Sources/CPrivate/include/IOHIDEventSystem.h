@@ -5,9 +5,10 @@
 
 CF_IMPLICIT_BRIDGING_ENABLED
 
-typedef struct __IOHIDEvent *IOHIDEventRef;
-typedef struct __IOHIDServiceClient *IOHIDServiceClientRef;
-typedef struct __IOHIDEventSystemClient *IOHIDEventSystemClientRef;
+// Bridged so Swift manages their retain counts like other CF types.
+typedef struct CF_BRIDGED_TYPE(id) __IOHIDEvent *IOHIDEventRef;
+typedef struct CF_BRIDGED_TYPE(id) __IOHIDServiceClient *IOHIDServiceClientRef;
+typedef struct CF_BRIDGED_TYPE(id) __IOHIDEventSystemClient *IOHIDEventSystemClientRef;
 
 // Temperature event type; its float field id is (type << 16).
 #define kIOHIDEventTypeTemperature 15
