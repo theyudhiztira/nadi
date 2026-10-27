@@ -13,7 +13,8 @@ extension SensorSet {
             temperature: TemperatureReader(smcKeys: smcKeys),
             fans: FanReader(),
             gpu: GPUReader(),
-            energy: EnergyReader()
+            energy: EnergyReader(),
+            processes: ProcessReader()
         )
     }
 }

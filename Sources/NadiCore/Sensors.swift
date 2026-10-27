@@ -42,6 +42,10 @@ public protocol EnergySensor: Sendable {
     func reading() -> EnergyReading?
 }
 
+public protocol ProcessSensor: Sendable {
+    func samples() -> [ProcessSample]?
+}
+
 public struct SensorSet: Sendable {
     public var cpu: any CPUSensor
     public var memory: any MemorySensor
@@ -52,6 +56,7 @@ public struct SensorSet: Sendable {
     public var fans: any FanSensor
     public var gpu: any GPUSensor
     public var energy: any EnergySensor
+    public var processes: any ProcessSensor
 
     public init(
         cpu: any CPUSensor,
@@ -62,7 +67,8 @@ public struct SensorSet: Sendable {
         temperature: any TemperatureSensor,
         fans: any FanSensor,
         gpu: any GPUSensor,
-        energy: any EnergySensor
+        energy: any EnergySensor,
+        processes: any ProcessSensor
     ) {
         self.cpu = cpu
         self.memory = memory
@@ -73,5 +79,6 @@ public struct SensorSet: Sendable {
         self.fans = fans
         self.gpu = gpu
         self.energy = energy
+        self.processes = processes
     }
 }

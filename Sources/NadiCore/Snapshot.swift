@@ -28,6 +28,8 @@ public struct Snapshot: Sendable, Equatable {
     /// Current speed of each fan.
     public var fanRPM: [Double]?
     public var energy: EnergyReading?
+    /// Only sampled while the panel is open; nil otherwise.
+    public var processes: [ProcessUsage]?
 
     public init(date: Date) {
         self.date = date

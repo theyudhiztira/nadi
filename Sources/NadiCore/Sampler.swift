@@ -14,6 +14,8 @@ public actor Sampler {
     private var previousDisk: ByteCounters?
     private var lastSlowRead: Date?
     private var diskFreeBytes: Int64?
+    private var samplesProcesses = false
+    private var previousProcessTimes: [Int32: UInt64] = [:]
 
     public init(sensors: SensorSet, interval: TimeInterval = 1, slowInterval: TimeInterval = 10) {
         self.sensors = sensors
@@ -23,6 +25,12 @@ public actor Sampler {
 
     public func setInterval(_ seconds: TimeInterval) {
         interval = Self.clamp(seconds)
+    }
+
+    /// Per-process sampling walks every pid, so it only runs while something shows the result.
+    public func setProcessSampling(_ enabled: Bool) {
+        samplesProcesses = enabled
+        if !enabled { previousProcessTimes = [:] }
     }
 
     public func sample(at now: Date = Date()) -> Snapshot {
@@ -61,6 +69,16 @@ public actor Sampler {
         snapshot.fanRPM = sensors.fans.rpm()
         snapshot.gpuUsage = sensors.gpu.utilization()
         snapshot.energy = sensors.energy.reading()
+
+        if samplesProcesses, let processes = sensors.processes.samples() {
+            if !previousProcessTimes.isEmpty {
+                let usage = TopProcesses.usage(previous: previousProcessTimes, current: processes, seconds: elapsed)
+                // The panel shows five; keep a few more of each ranking so switching the toggle never comes up short.
+                let keep = Set(TopProcesses.top(10, of: usage, by: .cpu).map(\.pid) + TopProcesses.top(10, of: usage, by: .memory).map(\.pid))
+                snapshot.processes = usage.filter { keep.contains($0.pid) }
+            }
+            previousProcessTimes = Dictionary(processes.map { ($0.pid, $0.cpuNanoseconds) }, uniquingKeysWith: { a, _ in a })
+        }
 
         previousDate = now
         return snapshot

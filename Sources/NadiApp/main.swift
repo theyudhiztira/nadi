@@ -10,7 +10,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var sampling: Task<Void, Never>?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        statusItem = StatusItemController(store: store)
+        statusItem = StatusItemController(store: store, sampler: sampler)
         sampling = Task { [sampler, store] in
             await sampler.run(into: store)
         }
@@ -19,6 +19,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         sampling?.cancel()
     }
+}
+
+// `Nadi --render-panel <file.png> [light|dark]` samples for a few seconds and writes the panel content as an image.
+if let index = CommandLine.arguments.firstIndex(of: "--render-panel"), CommandLine.arguments.count > index + 1 {
+    let dark = CommandLine.arguments.dropFirst(index + 2).first == "dark"
+    await PanelSnapshot.write(to: CommandLine.arguments[index + 1], dark: dark)
+    exit(0)
 }
 
 // `Nadi --dump [count]` prints snapshots to stdout instead of starting the menu bar app.
