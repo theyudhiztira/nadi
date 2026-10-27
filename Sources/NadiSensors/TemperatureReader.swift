@@ -21,9 +21,11 @@ public final class HIDTemperatureReader: TemperatureSensor, @unchecked Sendable 
         let services = (IOHIDEventSystemClientCopyServices(client) as? [AnyObject] ?? [])
             .map { unsafeDowncast($0, to: IOHIDServiceClient.self) }
         self.client = client
+        // Most sensors are listed twice under the same name; one of each is enough for a mean and halves the cost.
+        var seen = Set<String>()
         cpuServices = services.filter { service in
             let name = IOHIDServiceClientCopyProperty(service, "Product" as CFString) as? String ?? ""
-            return Self.cpuPrefixes.contains { name.hasPrefix($0) }
+            return Self.cpuPrefixes.contains { name.hasPrefix($0) } && seen.insert(name).inserted
         }
     }
 
