@@ -1,0 +1,5 @@
+.build/
+.swiftpm/
+Nadi.app/
+*.zip
+.DS_Store
