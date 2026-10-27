@@ -1,0 +1,8 @@
+module CPrivate {
+    header "IOHIDEventSystem.h"
+    header "IOReport.h"
+    header "SMC.h"
+    link framework "IOKit"
+    link "IOReport"
+    export *
+}
