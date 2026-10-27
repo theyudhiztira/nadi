@@ -3,3 +3,4 @@
 Nadi.app/
 *.zip
 .DS_Store
+spikes/*.app/

@@ -30,6 +30,7 @@ let package = Package(
             name: "SpikeSensors",
             dependencies: ["CPrivate"]
         ),
+        .executableTarget(name: "SpikeLogin"),
         .testTarget(
             name: "NadiCoreTests",
             dependencies: ["NadiCore"],
