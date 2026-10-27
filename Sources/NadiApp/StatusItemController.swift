@@ -58,7 +58,7 @@ final class StatusItemController {
         panel.makeKeyAndOrderFront(nil)
         item.button?.highlight(true)
 
-        Task { await sampler.setProcessSampling(true) }
+        Task { await sampler.setDetailed(true) }
         // Global monitors only see clicks in other apps, which is exactly "outside the panel".
         outsideClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
             Task { @MainActor in self?.closePanel() }
@@ -70,7 +70,7 @@ final class StatusItemController {
         item.button?.highlight(false)
         if let outsideClickMonitor { NSEvent.removeMonitor(outsideClickMonitor) }
         outsideClickMonitor = nil
-        Task { await sampler.setProcessSampling(false) }
+        Task { await sampler.setDetailed(false) }
     }
 
     private func makePanel() -> StatusPanel {
@@ -100,6 +100,6 @@ final class StatusItemController {
         let length = image.size.width + 8
         if item.length != length { item.length = length }
         button.image = image
-        button.setAccessibilityLabel(items.map { "\($0.label) \($0.value)" }.joined(separator: ", "))
+        button.setAccessibilityLabel(items.map(\.accessibilityText).joined(separator: ", "))
     }
 }

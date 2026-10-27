@@ -76,11 +76,63 @@ struct SamplerProcessTests {
         let sampler = Sampler(sensors: fakes.set)
         let start = Date(timeIntervalSince1970: 0)
         #expect(await sampler.sample(at: start).processes == nil)
-        await sampler.setProcessSampling(true)
+        await sampler.setDetailed(true)
         #expect(await sampler.sample(at: start.addingTimeInterval(1)).processes == nil)
         let usage = await sampler.sample(at: start.addingTimeInterval(2)).processes
         #expect(usage?.first?.cpu == 0.5)
         #expect(fakes.processTimes == [1_000_000_000])
+    }
+}
+
+struct SamplerTierTests {
+    @Test func panelOnlySensorsReadEveryFifthTickWhileClosed() async {
+        let fakes = Fakes()
+        let sampler = Sampler(sensors: fakes.set, menuBarMetrics: [.cpu])
+        let start = Date(timeIntervalSince1970: 0)
+        var fanReadings = 0
+        for second in 0..<10 {
+            if await sampler.sample(at: start.addingTimeInterval(Double(second))).fanRPM != nil { fanReadings += 1 }
+        }
+        #expect(fanReadings == 2)
+
+        await sampler.setDetailed(true)
+        #expect(await sampler.sample(at: start.addingTimeInterval(10.2)).fanRPM != nil)
+        #expect(await sampler.sample(at: start.addingTimeInterval(11.2)).fanRPM != nil)
+    }
+
+    @Test func menuBarMetricsReadEveryTick() async {
+        let fakes = Fakes()
+        let sampler = Sampler(sensors: fakes.set, menuBarMetrics: [.fan])
+        let start = Date(timeIntervalSince1970: 0)
+        for second in 0..<3 {
+            #expect(await sampler.sample(at: start.addingTimeInterval(Double(second))).fanRPM != nil)
+        }
+    }
+}
+
+struct PowerDisplayTests {
+    private func snapshot(charging: Bool, input: Double, battery: Double) -> Snapshot {
+        var s = Snapshot(date: Date())
+        var p = PowerStatus(externalConnected: true, isCharging: charging)
+        p.adapterInputWatts = input
+        p.adapterRatingWatts = 45
+        p.batteryWatts = battery
+        p.systemLoadWatts = 30
+        s.power = p
+        return s
+    }
+
+    @Test func chargingWellAndSlow() {
+        #expect(snapshot(charging: true, input: 40, battery: 22).powerDisplay == .charging(watts: 22, slow: false))
+        #expect(snapshot(charging: true, input: 15, battery: 4).powerDisplay == .charging(watts: 4, slow: true))
+    }
+
+    @Test func notChargingShowsSystemDraw() {
+        var s = snapshot(charging: false, input: 35, battery: -1)
+        #expect(s.powerDisplay == .consuming(watts: 30))
+        s.power?.systemLoadWatts = nil
+        s.energy = EnergyReading(systemWatts: 38)
+        #expect(s.powerDisplay == .consuming(watts: 38))
     }
 }
 

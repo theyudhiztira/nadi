@@ -12,8 +12,10 @@ public enum MetricID: String, CaseIterable, Sendable, Codable {
     case networkOut
     case diskRead
     case diskWrite
+    /// Upload plus download, for the menu bar's stacked network slot.
+    case network
 
-    public static let menuBarDefaults: [MetricID] = [.cpu, .memory, .cpuTemperature, .power]
+    public static let menuBarDefaults: [MetricID] = [.cpu, .memory, .cpuTemperature, .power, .network]
 
     public var label: String {
         switch self {
@@ -30,6 +32,7 @@ public enum MetricID: String, CaseIterable, Sendable, Codable {
         case .networkOut: "Up"
         case .diskRead: "Read"
         case .diskWrite: "Write"
+        case .network: "Net"
         }
     }
 

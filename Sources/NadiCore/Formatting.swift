@@ -20,7 +20,7 @@ public enum MetricFormatter {
             return watts(value)
         case .fan:
             return value < 999.5 ? "\(Int(value.rounded()))" : String(format: "%.1fk", value / 1000)
-        case .networkIn, .networkOut, .diskRead, .diskWrite:
+        case .networkIn, .networkOut, .diskRead, .diskWrite, .network:
             return bytesPerSecond(value)
         }
     }
@@ -67,7 +67,7 @@ public enum GraphScale {
             range = 0...max(peak, 10)
         case .fan:
             range = 0...max(peak, 6000)
-        case .networkIn, .networkOut, .diskRead, .diskWrite:
+        case .networkIn, .networkOut, .diskRead, .diskWrite, .network:
             // Scale to the busiest recent second, but never below 1 MB/s so idle chatter stays flat.
             range = 0...max(peak, 1_000_000)
         }
