@@ -11,13 +11,17 @@ public enum MetricFormatter {
     public static func format(_ value: Double?, for metric: MetricID, temperatureUnit: TemperatureUnit = .celsius) -> String {
         guard let value, value.isFinite else { return missing }
         switch metric {
-        case .cpu, .memory:
+        case .cpu, .memory, .gpu:
             return "\(Int((min(max(value, 0), 1) * 100).rounded()))%"
-        case .cpuTemperature:
+        case .cpuTemperature, .gpuTemperature:
             let shown = temperatureUnit == .celsius ? value : value * 9 / 5 + 32
             return "\(Int(shown.rounded()))°"
-        case .power:
+        case .power, .cpuPower, .gpuPower:
             return watts(value)
+        case .fan:
+            return value < 999.5 ? "\(Int(value.rounded()))" : String(format: "%.1fk", value / 1000)
+        case .networkIn, .networkOut, .diskRead, .diskWrite:
+            return bytesPerSecond(value)
         }
     }
 
@@ -51,14 +55,21 @@ public enum GraphScale {
     /// Maps raw samples to 0...1 bar heights. Nil samples stay nil.
     public static func fractions(_ values: [Double?], for metric: MetricID, adapterRatingWatts: Double? = nil) -> [Double?] {
         let range: ClosedRange<Double>
+        let peak = values.compactMap { $0 }.max() ?? 0
         switch metric {
-        case .cpu, .memory:
+        case .cpu, .memory, .gpu:
             range = 0...1
-        case .cpuTemperature:
+        case .cpuTemperature, .gpuTemperature:
             range = 30...100
         case .power:
-            let peak = values.compactMap { $0 }.max() ?? 0
             range = 0...max(adapterRatingWatts ?? 0, peak, 10)
+        case .cpuPower, .gpuPower:
+            range = 0...max(peak, 10)
+        case .fan:
+            range = 0...max(peak, 6000)
+        case .networkIn, .networkOut, .diskRead, .diskWrite:
+            // Scale to the busiest recent second, but never below 1 MB/s so idle chatter stays flat.
+            range = 0...max(peak, 1_000_000)
         }
         let span = range.upperBound - range.lowerBound
         return values.map { value in

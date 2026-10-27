@@ -5,6 +5,7 @@
 enum {
     kSMCHandleYPCEvent = 2,
     kSMCReadKey = 5,
+    kSMCGetKeyFromIndex = 8,
     kSMCGetKeyInfo = 9,
 };
 

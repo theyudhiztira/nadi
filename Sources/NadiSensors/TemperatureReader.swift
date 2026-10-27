@@ -2,16 +2,26 @@ import CPrivate
 import Foundation
 import NadiCore
 
-/// SoC temperatures from the private IOHIDEventSystemClient (usage page 0xff00, usage 5).
-public final class HIDTemperatureReader: TemperatureSensor, @unchecked Sendable {
+/// CPU temperature from SMC `Tp*` keys, falling back to the private IOHIDEventSystemClient (usage page 0xff00,
+/// usage 5). On M1 Max / macOS 27 the HID `PMU tdie*` sensors stay near 58 °C at full load while `Tp*` tracks it.
+/// GPU temperature from SMC `Tg*` keys, since HID names no GPU sensor there.
+public final class TemperatureReader: TemperatureSensor, @unchecked Sendable {
     // Name prefixes of the CPU die sensors. M1 Max on macOS 27 reports `PMU tdie0` to `PMU tdie10`.
     private static let cpuPrefixes = ["PMU tdie", "pACC MTR Temp Sensor", "eACC MTR Temp Sensor"]
+    private static let plausible = 1.0...150.0
 
     // Only touched from the Sampler actor, one call at a time.
     private let client: IOHIDEventSystemClient?
     private let cpuServices: [IOHIDServiceClient]
+    private let smc: SMC?
+    private let smcCPUKeys: [String]
+    private let smcGPUKeys: [String]
 
-    public init() {
+    public init(smcKeys: [String]) {
+        smc = SMC()
+        smcCPUKeys = smcKeys.filter { $0.hasPrefix("Tp") }
+        smcGPUKeys = smcKeys.filter { $0.hasPrefix("Tg") }
+
         guard let client = IOHIDEventSystemClientCreate(kCFAllocatorDefault) else {
             self.client = nil
             cpuServices = []
@@ -30,14 +40,31 @@ public final class HIDTemperatureReader: TemperatureSensor, @unchecked Sendable 
     }
 
     public func cpuCelsius() -> Double? {
+        smcMean(smcCPUKeys) ?? hidCPUCelsius()
+    }
+
+    private func hidCPUCelsius() -> Double? {
         let field = Int32(kIOHIDEventTypeTemperature << 16)
         let readings = cpuServices.compactMap { service -> Double? in
             guard let event = IOHIDServiceClientCopyEvent(service, Int64(kIOHIDEventTypeTemperature), 0, 0) else { return nil }
-            let celsius = IOHIDEventGetFloatValue(event, field)
-            // Idle sensors sometimes report 0 or garbage.
-            return (1...150).contains(celsius) ? celsius : nil
+            return IOHIDEventGetFloatValue(event, field)
         }
-        guard !readings.isEmpty else { return nil }
-        return readings.reduce(0, +) / Double(readings.count)
+        return Self.mean(readings)
+    }
+
+    public func gpuCelsius() -> Double? {
+        smcMean(smcGPUKeys)
+    }
+
+    private func smcMean(_ keys: [String]) -> Double? {
+        guard let smc else { return nil }
+        return Self.mean(keys.compactMap { smc.readDouble($0) })
+    }
+
+    /// Idle sensors sometimes report 0 or garbage, so implausible readings are dropped.
+    private static func mean(_ values: [Double]) -> Double? {
+        let valid = values.filter { plausible.contains($0) }
+        guard !valid.isEmpty else { return nil }
+        return valid.reduce(0, +) / Double(valid.count)
     }
 }

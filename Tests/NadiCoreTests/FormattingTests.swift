@@ -19,6 +19,12 @@ struct FormattingTests {
         #expect(MetricFormatter.format(9.96, for: .power) == "10W")
     }
 
+    @Test func fanAndRates() {
+        #expect(MetricFormatter.format(850, for: .fan) == "850")
+        #expect(MetricFormatter.format(2_683, for: .fan) == "2.7k")
+        #expect(MetricFormatter.format(1_500_000, for: .networkIn) == "1.5 MB/s")
+    }
+
     @Test func missingValue() {
         #expect(MetricFormatter.format(nil, for: .cpu) == "--")
         #expect(MetricFormatter.format(.nan, for: .power) == "--")

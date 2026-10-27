@@ -57,6 +57,10 @@ public actor Sampler {
 
         snapshot.power = sensors.power.status()
         snapshot.cpuTemperature = sensors.temperature.cpuCelsius()
+        snapshot.gpuTemperature = sensors.temperature.gpuCelsius()
+        snapshot.fanRPM = sensors.fans.rpm()
+        snapshot.gpuUsage = sensors.gpu.utilization()
+        snapshot.energy = sensors.energy.reading()
 
         previousDate = now
         return snapshot

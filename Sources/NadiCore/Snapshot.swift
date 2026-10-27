@@ -22,6 +22,12 @@ public struct Snapshot: Sendable, Equatable {
     public var diskFreeBytes: Int64?
     public var power: PowerStatus?
     public var cpuTemperature: Double?
+    public var gpuTemperature: Double?
+    /// Busy fraction 0...1.
+    public var gpuUsage: Double?
+    /// Current speed of each fan.
+    public var fanRPM: [Double]?
+    public var energy: EnergyReading?
 
     public init(date: Date) {
         self.date = date
@@ -33,6 +39,28 @@ public struct Snapshot: Sendable, Equatable {
         case .memory: memory?.fraction
         case .cpuTemperature: cpuTemperature
         case .power: power?.menuBarWatts
+        case .gpu: gpuUsage
+        case .gpuTemperature: gpuTemperature
+        case .fan: fanRPM?.max()
+        case .cpuPower: energy?.cpuWatts
+        case .gpuPower: energy?.gpuWatts
+        case .networkIn: network?.inPerSecond
+        case .networkOut: network?.outPerSecond
+        case .diskRead: disk?.inPerSecond
+        case .diskWrite: disk?.outPerSecond
         }
+    }
+}
+
+public struct EnergyReading: Sendable, Equatable {
+    public var cpuWatts: Double?
+    public var gpuWatts: Double?
+    /// Whole-system draw from the SMC, on AC or battery.
+    public var systemWatts: Double?
+
+    public init(cpuWatts: Double? = nil, gpuWatts: Double? = nil, systemWatts: Double? = nil) {
+        self.cpuWatts = cpuWatts
+        self.gpuWatts = gpuWatts
+        self.systemWatts = systemWatts
     }
 }

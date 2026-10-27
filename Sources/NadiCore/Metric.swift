@@ -3,6 +3,15 @@ public enum MetricID: String, CaseIterable, Sendable, Codable {
     case memory
     case cpuTemperature
     case power
+    case gpu
+    case gpuTemperature
+    case fan
+    case cpuPower
+    case gpuPower
+    case networkIn
+    case networkOut
+    case diskRead
+    case diskWrite
 
     public static let menuBarDefaults: [MetricID] = [.cpu, .memory, .cpuTemperature, .power]
 
@@ -12,16 +21,24 @@ public enum MetricID: String, CaseIterable, Sendable, Codable {
         case .memory: "RAM"
         case .cpuTemperature: "Temp"
         case .power: "In"
+        case .gpu: "GPU"
+        case .gpuTemperature: "GPU°"
+        case .fan: "Fan"
+        case .cpuPower: "CPU W"
+        case .gpuPower: "GPU W"
+        case .networkIn: "Down"
+        case .networkOut: "Up"
+        case .diskRead: "Read"
+        case .diskWrite: "Write"
         }
     }
 
     /// Placeholder until phase 7 brings user-set alert rules. Value in the metric's own unit.
     public var defaultAlertThreshold: Double? {
         switch self {
-        case .cpu: 0.9
-        case .memory: 0.9
-        case .cpuTemperature: 90
-        case .power: nil
+        case .cpu, .memory: 0.9
+        case .cpuTemperature, .gpuTemperature: 90
+        default: nil
         }
     }
 

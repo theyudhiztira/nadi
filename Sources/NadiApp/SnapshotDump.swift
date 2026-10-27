@@ -24,7 +24,10 @@ enum SnapshotDump {
             "net down \(s.network.map { f.bytesPerSecond($0.inPerSecond) } ?? f.missing) up \(s.network.map { f.bytesPerSecond($0.outPerSecond) } ?? f.missing)",
             "disk r \(s.disk.map { f.bytesPerSecond($0.inPerSecond) } ?? f.missing) w \(s.disk.map { f.bytesPerSecond($0.outPerSecond) } ?? f.missing)",
             "free \(s.diskFreeBytes.map { f.bytes(Double($0)) } ?? f.missing)",
-            "temp \(f.format(s.cpuTemperature, for: .cpuTemperature))",
+            "temp \(f.format(s.cpuTemperature, for: .cpuTemperature)) gpu \(f.format(s.gpuTemperature, for: .gpuTemperature))",
+            "fans \(s.fanRPM.map { $0.map { "\(Int($0))" }.joined(separator: "/") } ?? f.missing) rpm",
+            "gpu \(f.format(s.gpuUsage, for: .gpu))",
+            "watts cpu \(f.format(s.energy?.cpuWatts, for: .cpuPower)) gpu \(f.format(s.energy?.gpuWatts, for: .gpuPower)) system \(f.format(s.energy?.systemWatts, for: .power))",
         ]
         if let p = s.power {
             parts.append("power \(f.format(p.menuBarWatts, for: .power)) ac=\(p.externalConnected) charging=\(p.isCharging) \(p.percent.map { "\($0)%" } ?? f.missing) rating \(p.adapterRatingWatts.map(f.watts) ?? f.missing) battery \(p.batteryWatts.map { String(format: "%.1fW", $0) } ?? f.missing)")

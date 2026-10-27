@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import NadiCore
 
-private final class Fakes: CPUSensor, MemorySensor, NetworkSensor, DiskSensor, PowerSensor, TemperatureSensor, @unchecked Sendable {
+private final class Fakes: CPUSensor, MemorySensor, NetworkSensor, DiskSensor, PowerSensor, TemperatureSensor, FanSensor, GPUSensor, EnergySensor, @unchecked Sendable {
     var queuedTicks: [[CPUTicks]] = []
     var network: [ByteCounters] = []
     var freeCalls = 0
@@ -13,6 +13,14 @@ private final class Fakes: CPUSensor, MemorySensor, NetworkSensor, DiskSensor, P
     func freeBytes() -> Int64? { freeCalls += 1; return 42 }
     func status() -> PowerStatus? { nil }
     func cpuCelsius() -> Double? { 55 }
+    func gpuCelsius() -> Double? { nil }
+    func rpm() -> [Double]? { [1_200, 1_500] }
+    func utilization() -> Double? { 0.3 }
+    func reading() -> EnergyReading? { EnergyReading(cpuWatts: 4) }
+
+    var set: SensorSet {
+        SensorSet(cpu: self, memory: self, network: self, disk: self, power: self, temperature: self, fans: self, gpu: self, energy: self)
+    }
 }
 
 struct SamplerTests {
@@ -27,7 +35,7 @@ struct SamplerTests {
             .init(inBytes: 0, outBytes: 0), .init(inBytes: 0, outBytes: 0),
             .init(inBytes: 2_000, outBytes: 0), .init(inBytes: 0, outBytes: 0),
         ]
-        let sampler = Sampler(sensors: SensorSet(cpu: fakes, memory: fakes, network: fakes, disk: fakes, power: fakes, temperature: fakes))
+        let sampler = Sampler(sensors: fakes.set)
         let start = Date(timeIntervalSince1970: 0)
 
         let first = await sampler.sample(at: start)
@@ -35,6 +43,9 @@ struct SamplerTests {
         #expect(first.network == nil)
         #expect(first.memory?.fraction == 0.25)
         #expect(first.cpuTemperature == 55)
+        #expect(first.value(.fan) == 1_500)
+        #expect(first.value(.gpu) == 0.3)
+        #expect(first.value(.cpuPower) == 4)
 
         let second = await sampler.sample(at: start.addingTimeInterval(2))
         #expect(second.cpu?.total == 0.25)
@@ -45,7 +56,7 @@ struct SamplerTests {
 
     @Test func slowReadsRepeatAfterTheirInterval() async {
         let fakes = Fakes()
-        let sampler = Sampler(sensors: SensorSet(cpu: fakes, memory: fakes, network: fakes, disk: fakes, power: fakes, temperature: fakes))
+        let sampler = Sampler(sensors: fakes.set)
         let start = Date(timeIntervalSince1970: 0)
         for second in 0..<21 {
             _ = await sampler.sample(at: start.addingTimeInterval(Double(second)))

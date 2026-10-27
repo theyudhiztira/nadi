@@ -25,6 +25,21 @@ public protocol PowerSensor: Sendable {
 
 public protocol TemperatureSensor: Sendable {
     func cpuCelsius() -> Double?
+    func gpuCelsius() -> Double?
+}
+
+public protocol FanSensor: Sendable {
+    func rpm() -> [Double]?
+}
+
+public protocol GPUSensor: Sendable {
+    /// Busy fraction 0...1.
+    func utilization() -> Double?
+}
+
+public protocol EnergySensor: Sendable {
+    /// Watts averaged since the previous call; the first call may have no GPU figure yet.
+    func reading() -> EnergyReading?
 }
 
 public struct SensorSet: Sendable {
@@ -34,6 +49,9 @@ public struct SensorSet: Sendable {
     public var disk: any DiskSensor
     public var power: any PowerSensor
     public var temperature: any TemperatureSensor
+    public var fans: any FanSensor
+    public var gpu: any GPUSensor
+    public var energy: any EnergySensor
 
     public init(
         cpu: any CPUSensor,
@@ -41,7 +59,10 @@ public struct SensorSet: Sendable {
         network: any NetworkSensor,
         disk: any DiskSensor,
         power: any PowerSensor,
-        temperature: any TemperatureSensor
+        temperature: any TemperatureSensor,
+        fans: any FanSensor,
+        gpu: any GPUSensor,
+        energy: any EnergySensor
     ) {
         self.cpu = cpu
         self.memory = memory
@@ -49,5 +70,8 @@ public struct SensorSet: Sendable {
         self.disk = disk
         self.power = power
         self.temperature = temperature
+        self.fans = fans
+        self.gpu = gpu
+        self.energy = energy
     }
 }

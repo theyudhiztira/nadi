@@ -10,6 +10,7 @@ final class StatusItemController {
     private var temperatureUnit: TemperatureUnit = .celsius
     private var lastRendered: [MenuBarRenderer.Item] = []
     private var appearanceObservation: NSKeyValueObservation?
+    private var appearanceName: NSAppearance.Name?
 
     init(store: LiveStore) {
         self.store = store
@@ -20,10 +21,16 @@ final class StatusItemController {
         render()
         observe()
         // The pre-rendered bitmap bakes in colors when a value is alerting, so redraw on light/dark switches.
-        appearanceObservation = item.button?.observe(\.effectiveAppearance) { [weak self] _, _ in
+        // KVO also fires on unrelated button updates, so compare the light/dark match before redrawing.
+        appearanceName = item.button?.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua])
+        appearanceObservation = item.button?.observe(\.effectiveAppearance) { [weak self] button, _ in
             Task { @MainActor in
-                self?.lastRendered = []
-                self?.render()
+                guard let self else { return }
+                let name = button.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua])
+                guard name != self.appearanceName else { return }
+                self.appearanceName = name
+                self.lastRendered = []
+                self.render()
             }
         }
     }

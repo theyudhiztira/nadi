@@ -119,9 +119,11 @@ extension MenuBarRenderer.Item {
 extension MetricID {
     var widestValue: String {
         switch self {
-        case .cpu, .memory: "100%"
-        case .cpuTemperature: "100°"
-        case .power: "100W"
+        case .cpu, .memory, .gpu: "100%"
+        case .cpuTemperature, .gpuTemperature: "100°"
+        case .power, .cpuPower, .gpuPower: "100W"
+        case .fan: "9.9k"
+        case .networkIn, .networkOut, .diskRead, .diskWrite: "999 KB/s"
         }
     }
 }
