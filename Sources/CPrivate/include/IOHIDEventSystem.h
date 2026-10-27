@@ -3,6 +3,8 @@
 #include <CoreFoundation/CoreFoundation.h>
 #include <stdint.h>
 
+CF_IMPLICIT_BRIDGING_ENABLED
+
 typedef struct __IOHIDEvent *IOHIDEventRef;
 typedef struct __IOHIDServiceClient *IOHIDServiceClientRef;
 typedef struct __IOHIDEventSystemClient *IOHIDEventSystemClientRef;
@@ -16,3 +18,5 @@ CFArrayRef IOHIDEventSystemClientCopyServices(IOHIDEventSystemClientRef client);
 CFTypeRef IOHIDServiceClientCopyProperty(IOHIDServiceClientRef service, CFStringRef key);
 IOHIDEventRef IOHIDServiceClientCopyEvent(IOHIDServiceClientRef service, int64_t type, int32_t options, int64_t timestamp);
 double IOHIDEventGetFloatValue(IOHIDEventRef event, int32_t field);
+
+CF_IMPLICIT_BRIDGING_DISABLED

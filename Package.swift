@@ -25,6 +25,11 @@ let package = Package(
             dependencies: ["NadiCore", "CPrivate"]
         ),
         .target(name: "CPrivate"),
+        // Phase 0 spike, removed once the phase 3 readers replace it.
+        .executableTarget(
+            name: "SpikeSensors",
+            dependencies: ["CPrivate"]
+        ),
         .testTarget(
             name: "NadiCoreTests",
             dependencies: ["NadiCore"],

@@ -3,6 +3,8 @@
 #include <CoreFoundation/CoreFoundation.h>
 #include <stdint.h>
 
+CF_IMPLICIT_BRIDGING_ENABLED
+
 typedef struct IOReportSubscription *IOReportSubscriptionRef;
 
 CFMutableDictionaryRef IOReportCopyChannelsInGroup(CFStringRef group, CFStringRef subgroup,
@@ -19,3 +21,5 @@ CFStringRef IOReportChannelGetSubGroup(CFDictionaryRef channel);
 CFStringRef IOReportChannelGetChannelName(CFDictionaryRef channel);
 CFStringRef IOReportChannelGetUnitLabel(CFDictionaryRef channel);
 int64_t IOReportSimpleGetIntegerValue(CFDictionaryRef channel, int32_t index);
+
+CF_IMPLICIT_BRIDGING_DISABLED
