@@ -1,7 +1,8 @@
 // Phase 0 spike: can an ad-hoc signed bundle use SMAppService.mainApp and post a notification?
 import AppKit
 import ServiceManagement
-import UserNotifications
+// Older SDKs (CI's macos-15 image) don't mark UNNotificationSettings Sendable.
+@preconcurrency import UserNotifications
 
 func log(_ line: String) {
     print(line)
