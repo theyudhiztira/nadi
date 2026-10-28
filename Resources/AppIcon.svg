@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <title>Nadi</title>
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#14473A"/>
+      <stop offset="1" stop-color="#0A2A22"/>
+    </linearGradient>
+    <!-- Trace fades in from the left: older samples dim, newest on the right, as in the app's charts. -->
+    <linearGradient id="trace" gradientUnits="userSpaceOnUse" x1="180" y1="0" x2="760" y2="0">
+      <stop offset="0" stop-color="#7CF2C0" stop-opacity="0.15"/>
+      <stop offset="0.5" stop-color="#7CF2C0"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="125%">
+      <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#000" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+
+  <!-- macOS icon grid: 824 body on a 1024 canvas, corner radius about 185. -->
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#tile)" filter="url(#shadow)"/>
+
+  <!-- A pulse trace whose three strokes draw an N; the dot is the latest sample. -->
+  <path d="M190 700 H318 L382 330 L640 700 L704 330"
+        fill="none" stroke="url(#trace)" stroke-width="72" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="704" cy="330" r="50" fill="#7CF2C0"/>
+</svg>

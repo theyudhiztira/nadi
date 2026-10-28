@@ -1,3 +1,5 @@
+<img src="Resources/AppIcon.svg" alt="Nadi app icon" width="64" height="64">
+
 # Nadi
 
 Nadi (Javanese and Indonesian for *pulse*) is a macOS menu bar app that shows live system vitals as small graphs: CPU, memory, CPU temperature, power draw and network traffic. Click the menu bar item to open a panel with history charts, per-core load, fans, battery details and the top processes.
