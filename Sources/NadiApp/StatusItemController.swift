@@ -7,6 +7,7 @@ final class StatusItemController {
     private let renderer = MenuBarRenderer()
     private let store: LiveStore
     private let sampler: Sampler
+    private let loginItem = LoginItem()
     private var panel: StatusPanel?
     private var outsideClickMonitor: Any?
     private var metrics: [MetricID] = MetricID.menuBarDefaults
@@ -55,6 +56,7 @@ final class StatusItemController {
         var x = buttonWindow.frame.midX - PanelView.width / 2
         x = min(max(x, visible.minX + 6), visible.maxX - PanelView.width - 6)
         panel.setFrame(NSRect(x: x, y: buttonWindow.frame.minY - 4 - height, width: PanelView.width, height: height), display: true)
+        loginItem.refresh()
         panel.makeKeyAndOrderFront(nil)
         item.button?.highlight(true)
 
@@ -74,7 +76,7 @@ final class StatusItemController {
     }
 
     private func makePanel() -> StatusPanel {
-        let panel = StatusPanel(rootView: PanelView(store: store, onQuit: { NSApp.terminate(nil) }))
+        let panel = StatusPanel(rootView: PanelView(store: store, loginItem: loginItem, onQuit: { NSApp.terminate(nil) }))
         panel.onCancel = { [weak self] in self?.closePanel() }
         return panel
     }

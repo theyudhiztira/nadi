@@ -5,6 +5,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Added
+
+- "Open at login" checkbox in the panel, backed by `SMAppService`. When Nadi is turned off in System Settings, the panel says so and links to Login Items.
+
 ## [0.0.1] - 2026-10-29
 
 First public build, released as a beta.

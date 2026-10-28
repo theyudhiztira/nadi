@@ -6,6 +6,7 @@ import SwiftUI
 /// The dropdown panel. One scrolling column; each section has its own shape for what it shows.
 struct PanelView: View {
     let store: LiveStore
+    let loginItem: LoginItem
     let onQuit: () -> Void
 
     var body: some View {
@@ -15,6 +16,8 @@ struct PanelView: View {
                     .padding(.horizontal, 14)
                     .padding(.vertical, 12)
             }
+            Divider()
+            LoginItemRow(loginItem: loginItem)
             Divider()
             PanelFooter(onQuit: onQuit)
         }
@@ -330,6 +333,39 @@ private struct Note: View {
 
     var body: some View {
         Text(text).font(.system(size: 12)).foregroundStyle(.secondary)
+    }
+}
+
+private struct LoginItemRow: View {
+    let loginItem: LoginItem
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Toggle("Open at login", isOn: Binding(get: { loginItem.isEnabled }, set: { loginItem.setEnabled($0) }))
+                    .toggleStyle(.checkbox)
+                    .disabled(!loginItem.isAvailable || loginItem.needsApproval)
+                Spacer()
+                if loginItem.needsApproval {
+                    Button("Open Login Items") { loginItem.openLoginItemsSettings() }
+                }
+            }
+            if let note {
+                Text(note)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .controlSize(.small)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+    }
+
+    private var note: String? {
+        if !loginItem.isAvailable { return "Only works when Nadi runs from Nadi.app." }
+        if loginItem.needsApproval { return "Nadi is turned off in Login Items. Turn it back on there." }
+        return loginItem.error.map { "Could not change it: \($0)" }
     }
 }
 

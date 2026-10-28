@@ -72,9 +72,10 @@ Two debugging flags skip the menu bar and print to the terminal or a file:
 - Menu bar graphs for CPU, RAM, CPU temperature, power and network. Power shows the watts going into the battery while charging, and the whole-system draw otherwise. A metric over its alert threshold turns red.
 - A panel with sections for CPU (per core, efficiency and performance cores), memory (pressure and swap), temperatures, GPU, fans, power and battery, network, disk and the top processes by CPU or memory. Charts cover the last 10 minutes.
 - Sensors that need no `sudo`.
+- An "Open at login" checkbox in the panel. It registers Nadi.app with macOS, so it shows up in System Settings under General, Login Items, where it can also be turned off. Move Nadi.app to its final folder before you turn it on.
 - Measured on the M1 Max: 0.71 to 0.73% CPU over 90 seconds and 42 MB of memory with the panel closed.
 
-Not built yet, in this order: a 24-hour history stored in SQLite, a settings window (choose menu bar metrics, refresh rate, °C or °F, launch at login), and alerts.
+Not built yet, in this order: a 24-hour history stored in SQLite, a settings window (choose menu bar metrics, refresh rate, °C or °F), and alerts.
 
 ## Private APIs
 
