@@ -7,15 +7,41 @@ Nadi (Javanese and Indonesian for *pulse*) is a macOS menu bar app that shows li
 ![Nadi menu bar in dark mode](docs/images/panel-dark-menubar.png)
 ![Nadi menu bar in light mode](docs/images/panel-light-menubar.png)
 
-Status: pre-release (`0.0.1`). There is no download yet, you build it from source. See [What works today](#what-works-today).
+Status: pre-release. Download a build from the [Releases page](https://github.com/theyudhiztira/nadi/releases) or build it from source. See [What works today](#what-works-today).
 
 ## Requirements
 
 - Apple Silicon Mac. Intel is not supported.
 - macOS 14 Sonoma or later.
-- A Swift 6 toolchain: Xcode 16 or later, or the Command Line Tools that ship Swift 6.
+- To build from source: a Swift 6 toolchain, from Xcode 16 or later or the Command Line Tools that ship Swift 6.
 
 Nadi has only been tested on one machine: a MacBook Pro M1 Max on macOS 27.0.1. Sensor names differ between chip generations, so readings on M2 to M4 chips may be missing or wrong. Reports are welcome, see [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Install
+
+1. Download `Nadi-<version>.zip` from the [Releases page](https://github.com/theyudhiztira/nadi/releases).
+2. Double-click the ZIP in Downloads to unpack `Nadi.app`. Safari may have unpacked it already.
+3. Drag `Nadi.app` into Applications.
+4. Open Nadi from Applications. macOS blocks it the first time. Close the dialog.
+5. Open System Settings, go to Privacy & Security, scroll down to the message about Nadi and click Open Anyway. Confirm with your password or Touch ID.
+
+Nadi then opens normally from now on. It has no Dock icon: look for it in the menu bar.
+
+macOS blocks the first launch because Nadi is signed ad hoc, not with a paid Apple Developer ID, and Apple has not notarized it. The source of every release is in this repository, and you can build the same app yourself (see below).
+
+If you prefer the terminal, this removes the download flag instead of steps 4 and 5:
+
+```sh
+xattr -dr com.apple.quarantine /Applications/Nadi.app
+```
+
+Each release also has a `.sha256` file. To check the download, put both files in the same folder and run:
+
+```sh
+shasum -a 256 -c Nadi-<version>.zip.sha256
+```
+
+It prints `OK` when the ZIP matches.
 
 ## Build and run
 
@@ -72,9 +98,9 @@ What this means for you:
 
 Nadi makes no network connections and collects no telemetry. It reads local sensors and keeps the samples in memory.
 
-## Releases and Gatekeeper
+## Releases
 
-Release builds, when they exist, will be ad-hoc signed and not notarized, because there is no Apple Developer ID yet. macOS will block the first launch of a downloaded copy. Right-click `Nadi.app`, choose Open, then confirm. A copy you build yourself with `scripts/bundle.sh` is not quarantined and opens normally.
+Pushing a version tag builds the ZIP on GitHub Actions and opens a draft release. The steps are in [docs/RELEASING.md](docs/RELEASING.md). A copy you build yourself with `scripts/bundle.sh` has no download flag and opens without the Gatekeeper prompt.
 
 ## Project layout
 

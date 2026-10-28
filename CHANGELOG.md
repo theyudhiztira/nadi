@@ -13,6 +13,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - `scripts/bundle.sh`, which builds `Nadi.app` and signs it ad hoc.
 - `Nadi --dump` and `Nadi --render-panel` debugging flags.
 - README, contributing guide, code of conduct, security policy, issue and pull request templates, and a CI workflow.
+- App icon, also shown at the top of the README.
+- The panel footer shows the app version and build number.
+- Hovering a history chart or a core bar shows its value.
+- `scripts/make-zip.sh` and a Release workflow that turns a version tag into a draft GitHub release with a ZIP and its SHA-256 checksum.
 
 ### Known gaps
 
