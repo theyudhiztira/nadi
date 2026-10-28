@@ -316,6 +316,11 @@ private struct PanelFooter: View {
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
             Spacer()
+            // Selectable so a bug report can paste it.
+            Text(Self.version)
+                .font(.system(size: 11).monospacedDigit())
+                .foregroundStyle(.secondary)
+                .textSelection(.enabled)
             Button("Quit Nadi", action: onQuit)
                 .keyboardShortcut("q")
         }
@@ -323,6 +328,14 @@ private struct PanelFooter: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
     }
+
+    /// "v0.0.1 (1)" from Info.plist. A bare binary outside Nadi.app has no Info.plist.
+    private static let version: String = {
+        let info = Bundle.main.infoDictionary
+        guard let short = info?["CFBundleShortVersionString"] as? String else { return "Dev build" }
+        let build = info?["CFBundleVersion"] as? String
+        return build.map { "v\(short) (\($0))" } ?? "v\(short)"
+    }()
 }
 
 extension MemoryPressure {
