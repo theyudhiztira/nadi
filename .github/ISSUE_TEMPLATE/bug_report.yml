@@ -1,0 +1,44 @@
+name: Bug report
+description: Something is wrong, missing or shows a dash
+labels: [bug]
+body:
+  - type: input
+    id: mac
+    attributes:
+      label: Mac model and chip
+      placeholder: MacBook Pro 14-inch, M3 Pro
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      placeholder: "15.1"
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Nadi version or commit
+      placeholder: 0.0.1, or output of `git rev-parse --short HEAD`
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened
+      description: Add a screenshot if it is a visual problem.
+    validations:
+      required: true
+  - type: textarea
+    id: dump
+    attributes:
+      label: Output of `Nadi --dump 3`
+      description: Needed when a metric is missing or wrong. Run `.build/release/Nadi --dump 3` and paste the result.
+      render: text

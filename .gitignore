@@ -2,5 +2,9 @@
 .swiftpm/
 Nadi.app/
 *.zip
+*.dSYM/
 .DS_Store
 spikes/*.app/
+.serena/
+.vscode/
+.idea/

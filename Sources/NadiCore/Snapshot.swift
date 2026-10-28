@@ -62,7 +62,7 @@ public enum PowerDisplay: Sendable, Equatable {
     /// Whole-system draw.
     case consuming(watts: Double?)
 
-    /// Same threshold as the slow-charging alert in PLAN phase 7.
+    /// Same threshold as the planned slow-charging alert.
     public static let slowFraction = 0.4
 }
 

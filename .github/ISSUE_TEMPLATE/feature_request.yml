@@ -1,0 +1,25 @@
+name: Feature request
+description: Propose a metric, a setting or a change
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Settings, 24-hour history and alerts are already planned. Search the open issues before filing a new one.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What do you want to do that Nadi does not let you do?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would you change
+      description: For a new metric, name the source (public API, SMC key, IOKit property) if you know it.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered

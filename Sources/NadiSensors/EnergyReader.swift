@@ -3,7 +3,7 @@ import Foundation
 import NadiCore
 
 /// GPU watts from IOReport `Energy Model / GPU Energy`; CPU and system watts from SMC power keys.
-/// On macOS 27 the IOReport CPU channels are frozen for unprivileged readers (docs/spikes.md).
+/// On macOS 27 the IOReport CPU channels are frozen for unprivileged readers.
 public final class EnergyReader: EnergySensor, @unchecked Sendable {
     // Only touched from the Sampler actor.
     private let smc: SMC?
