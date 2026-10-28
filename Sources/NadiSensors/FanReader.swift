@@ -7,7 +7,8 @@ public final class FanReader: FanSensor, @unchecked Sendable {
 
     public init() {
         smc = SMC()
-        count = smc?.readUInt("FNum").map(Int.init) ?? 0
+        // `FNum` is a ui8; the clamp keeps a garbage reading from trapping or looping for minutes.
+        count = Int(min(smc?.readUInt("FNum") ?? 0, UInt64(UInt8.max)))
     }
 
     public func rpm() -> [Double]? {

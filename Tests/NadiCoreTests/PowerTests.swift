@@ -7,6 +7,13 @@ struct PowerTests {
         #expect(PowerStatus.watts(millivolts: 12_000, milliamps: -1_500) == -18)
     }
 
+    @Test func nonFiniteNumbersAreDropped() throws {
+        let props: [String: Any] = ["ExternalConnected": true, "CurrentCapacity": Double.nan, "CycleCount": 1e30]
+        let status = try #require(PowerStatus(smartBattery: props))
+        #expect(status.percent == nil)
+        #expect(status.cycleCount == nil)
+    }
+
     @Test func parsesSmartBatteryOnAC() throws {
         let props: [String: Any] = [
             "ExternalConnected": true,

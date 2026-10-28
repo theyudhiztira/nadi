@@ -66,7 +66,7 @@ public struct PowerStatus: Sendable, Equatable {
         case let v as Int: v
         case let v as Int64: Int(v)
         case let v as UInt64: Int(Int64(bitPattern: v))
-        case let v as Double: Int(v)
+        case let v as Double: Int(exactly: v.rounded(.towardZero))
         default: nil
         }
     }

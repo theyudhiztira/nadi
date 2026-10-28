@@ -25,7 +25,7 @@ enum SnapshotDump {
             "disk r \(s.disk.map { f.bytesPerSecond($0.inPerSecond) } ?? f.missing) w \(s.disk.map { f.bytesPerSecond($0.outPerSecond) } ?? f.missing)",
             "free \(s.diskFreeBytes.map { f.bytes(Double($0)) } ?? f.missing)",
             "temp \(f.format(s.cpuTemperature, for: .cpuTemperature)) gpu \(f.format(s.gpuTemperature, for: .gpuTemperature))",
-            "fans \(s.fanRPM.map { $0.map { "\(Int($0))" }.joined(separator: "/") } ?? f.missing) rpm",
+            "fans \(s.fanRPM.map { $0.map { $0.formatted(.number.precision(.fractionLength(0)).grouping(.never)) }.joined(separator: "/") } ?? f.missing) rpm",
             "gpu \(f.format(s.gpuUsage, for: .gpu))",
             "watts cpu \(f.format(s.energy?.cpuWatts, for: .cpuPower)) gpu \(f.format(s.energy?.gpuWatts, for: .gpuPower)) system \(f.format(s.energy?.systemWatts, for: .power))",
         ]

@@ -30,6 +30,14 @@ struct FormattingTests {
         #expect(MetricFormatter.format(.nan, for: .power) == "--")
     }
 
+    @Test func unrepresentableValuesDoNotTrap() {
+        #expect(MetricFormatter.watts(.nan) == "--")
+        #expect(MetricFormatter.watts(.infinity) == "--")
+        #expect(MetricFormatter.watts(1e30) == "--")
+        #expect(MetricFormatter.format(-1e30, for: .fan) == "--")
+        #expect(MetricFormatter.format(1e30, for: .cpuTemperature) == "--")
+    }
+
     @Test func bytes() {
         #expect(MetricFormatter.bytes(512) == "512 B")
         #expect(MetricFormatter.bytes(1_260) == "1.3 KB")

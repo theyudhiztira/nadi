@@ -13,5 +13,6 @@ mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 cp "$bin" "$app/Contents/MacOS/Nadi"
 cp Resources/Info.plist "$app/Contents/Info.plist"
 
-codesign --force -s - "$app"
+# Hardened runtime blocks DYLD_INSERT_LIBRARIES and unsigned library loads into the app.
+codesign --force --options runtime -s - "$app"
 echo "Built $(pwd)/$app"

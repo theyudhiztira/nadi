@@ -12,14 +12,14 @@ public enum MetricFormatter {
         guard let value, value.isFinite else { return missing }
         switch metric {
         case .cpu, .memory, .gpu:
-            return "\(Int((min(max(value, 0), 1) * 100).rounded()))%"
+            return "\(whole(min(max(value, 0), 1) * 100) ?? missing)%"
         case .cpuTemperature, .gpuTemperature:
             let shown = temperatureUnit == .celsius ? value : value * 9 / 5 + 32
-            return "\(Int(shown.rounded()))°"
+            return whole(shown).map { "\($0)°" } ?? missing
         case .power, .cpuPower, .gpuPower:
             return watts(value)
         case .fan:
-            return value < 999.5 ? "\(Int(value.rounded()))" : String(format: "%.1fk", value / 1000)
+            return value < 999.5 ? whole(value) ?? missing : String(format: "%.1fk", value / 1000)
         case .networkIn, .networkOut, .diskRead, .diskWrite, .network:
             return bytesPerSecond(value)
         }
@@ -28,7 +28,8 @@ public enum MetricFormatter {
     /// Whole watts from 10 W up, one decimal below.
     public static func watts(_ value: Double) -> String {
         let v = max(value, 0)
-        return v < 9.95 ? String(format: "%.1fW", v) : "\(Int(v.rounded()))W"
+        if v < 9.95 { return String(format: "%.1fW", v) }
+        return whole(v).map { "\($0)W" } ?? missing
     }
 
     /// Decimal units, matching Activity Monitor: 999 KB/s, 1.2 MB/s.
@@ -46,8 +47,13 @@ public enum MetricFormatter {
             v /= base
             i += 1
         }
-        if i == 0 || v >= 9.95 { return "\(Int(v.rounded())) \(units[i])" }
+        if i == 0 || v >= 9.95 { return whole(v).map { "\($0) \(units[i])" } ?? missing }
         return String(format: "%.1f %@", v, units[i])
+    }
+
+    /// Nil for NaN, infinity, or anything past Int's range, where `Int(_:)` would trap.
+    private static func whole(_ value: Double) -> String? {
+        Int(exactly: value.rounded()).map(String.init)
     }
 }
 

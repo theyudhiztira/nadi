@@ -33,7 +33,7 @@ enum PanelSnapshot {
         let appearance = NSAppearance(named: dark ? .darkAqua : .aqua)!
         let items = MetricID.menuBarDefaults.map { MenuBarRenderer.Item(metric: $0, store: store, temperatureUnit: .celsius) }
         let strip = MenuBarRenderer().image(for: items, appearance: appearance, scale: 2)
-        let stripPath = path.replacingOccurrences(of: ".png", with: "-menubar.png")
+        let stripPath = URL(fileURLWithPath: path).deletingPathExtension().path(percentEncoded: false) + "-menubar.png"
         if let cg = strip.cgImage(forProposedRect: nil, context: nil, hints: nil) {
             let canvas = NSImage(size: NSSize(width: strip.size.width + 16, height: strip.size.height))
             canvas.lockFocus()

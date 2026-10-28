@@ -34,7 +34,7 @@ final class SMC {
     /// Every key the SMC exposes. Slow (one call per key); use once at startup.
     func allKeys() -> [String] {
         guard let count = readUInt("#KEY") else { return [] }
-        return (0..<UInt32(count)).compactMap { index in
+        return (0..<UInt32(clamping: count)).compactMap { index in
             var input = SMCParamStruct()
             input.data8 = UInt8(kSMCGetKeyFromIndex)
             input.data32 = index
@@ -49,7 +49,8 @@ final class SMC {
         case "flt ":
             guard bytes.count == 4 else { return nil }
             // Apple Silicon stores floats little-endian, unlike the big-endian integer types.
-            return Double(bytes.withUnsafeBytes { $0.loadUnaligned(as: Float.self) })
+            let value = Double(bytes.withUnsafeBytes { $0.loadUnaligned(as: Float.self) })
+            return value.isFinite ? value : nil
         case "ui8 ", "ui16", "ui32":
             return Double(bytes.reduce(UInt64(0)) { $0 << 8 | UInt64($1) })
         case "sp78":
