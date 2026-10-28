@@ -8,3 +8,4 @@ spikes/*.app/
 .serena/
 .vscode/
 .idea/
+dist/
