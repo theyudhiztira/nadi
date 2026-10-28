@@ -58,10 +58,11 @@ struct PanelSections: View {
             HistoryChart(store: store, series: [.init(metric: .cpu, name: "CPU")], alerting: MetricID.cpu.isAlerting(s?.cpu?.total))
             if let load = s?.cpu, let counts = CPUReader.coreCounts, counts.performance + counts.efficiency == load.perCore.count {
                 // Apple Silicon numbers efficiency cores first.
-                CoreBars(title: "Efficiency", loads: Array(load.perCore.prefix(counts.efficiency)))
-                CoreBars(title: "Performance", loads: Array(load.perCore.suffix(counts.performance)))
+                let columns = max(counts.efficiency, counts.performance)
+                CoreBars(title: "Efficiency", loads: Array(load.perCore.prefix(counts.efficiency)), columns: columns)
+                CoreBars(title: "Performance", loads: Array(load.perCore.suffix(counts.performance)), columns: columns)
             } else if let load = s?.cpu {
-                CoreBars(title: "Cores", loads: load.perCore)
+                CoreBars(title: "Cores", loads: load.perCore, columns: load.perCore.count)
             }
         }
     }
@@ -270,6 +271,8 @@ private struct Facts: View {
 private struct CoreBars: View {
     let title: String
     let loads: [Double]
+    let columns: Int
+    @ViewState private var hovered: Int?
 
     var body: some View {
         HStack(alignment: .bottom, spacing: 8) {
@@ -277,16 +280,42 @@ private struct CoreBars: View {
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
                 .frame(width: 76, alignment: .leading)
+            // Every row splits the width into the same number of columns, so two efficiency
+            // cores and eight performance cores read at the same scale; unused columns stay empty.
             HStack(alignment: .bottom, spacing: 3) {
-                ForEach(Array(loads.enumerated()), id: \.offset) { _, load in
-                    ZStack(alignment: .bottom) {
-                        RoundedRectangle(cornerRadius: 1.5).fill(Color.secondary.opacity(0.2))
-                        RoundedRectangle(cornerRadius: 1.5)
-                            .fill(Color.accentColor)
-                            .frame(height: max(1, 18 * load))
+                ForEach(0..<max(columns, loads.count), id: \.self) { i in
+                    Group {
+                        if i < loads.count {
+                            ZStack(alignment: .bottom) {
+                                RoundedRectangle(cornerRadius: 1.5).fill(Color.secondary.opacity(0.2))
+                                RoundedRectangle(cornerRadius: 1.5)
+                                    .fill(Color.accentColor)
+                                    .frame(height: max(1, 18 * loads[i]))
+                            }
+                            .onHover { inside in
+                                if inside { hovered = i } else if hovered == i { hovered = nil }
+                            }
+                        } else {
+                            Color.clear
+                        }
                     }
-                    // Fixed width so two efficiency cores and eight performance cores read at the same scale.
-                    .frame(width: 12, height: 18)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 18)
+                    // Drawn by hand: the panel never activates the app, so system tooltips from .help() don't appear.
+                    .overlay(alignment: .top) {
+                        if hovered == i, i < loads.count {
+                            Text(MetricFormatter.format(loads[i], for: .cpu))
+                                .font(.system(size: 11).monospacedDigit())
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 4))
+                                .shadow(color: .black.opacity(0.2), radius: 2, y: 1)
+                                .fixedSize()
+                                .offset(y: -22)
+                                .allowsHitTesting(false)
+                        }
+                    }
+                    .zIndex(hovered == i ? 1 : 0)
                 }
             }
         }
