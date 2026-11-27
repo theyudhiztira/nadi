@@ -2,46 +2,35 @@
 
 # Nadi
 
-Nadi (Javanese and Indonesian for *pulse*) is a macOS menu bar app that shows live system vitals as small graphs: CPU, memory, CPU temperature, power draw and network traffic. Click the menu bar item to open a panel with history charts, per-core load, fans, battery details and the top processes.
+Nadi (Javanese and Indonesian for *pulse*) is a macOS menu bar app for live system vitals: CPU, memory, temperature, power and network. Click the menu bar item to open a panel with 10-minute charts, per-core load, GPU, fans, battery details and top processes.
 
 ![Nadi menu bar in dark mode](docs/images/panel-dark-menubar.png)
 ![Nadi menu bar in light mode](docs/images/panel-light-menubar.png)
 
-Status: pre-release. Download a build from the [Releases page](https://github.com/theyudhiztira/nadi/releases) or build it from source. See [What works today](#what-works-today).
-
 ## Requirements
 
-- Apple Silicon Mac. Intel is not supported.
-- macOS 14 Sonoma or later.
-- To build from source: a Swift 6 toolchain, from Xcode 16 or later or the Command Line Tools that ship Swift 6.
+- Apple Silicon Mac on macOS 14 Sonoma or later.
+- To build from source: Swift 6 (Xcode 16+ or Command Line Tools).
 
-Nadi has only been tested on one machine: a MacBook Pro M1 Max on macOS 27.0.1. Sensor names differ between chip generations, so readings on M2 to M4 chips may be missing or wrong. Reports are welcome, see [CONTRIBUTING.md](CONTRIBUTING.md).
+Tested on a MacBook Pro M1 Max (macOS 27.0.1). Sensor keys vary across M1 to M4 chips; if a reading is missing on your Mac, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Install
 
-1. Download `Nadi-<version>.zip` from the [Releases page](https://github.com/theyudhiztira/nadi/releases).
-2. Double-click the ZIP in Downloads to unpack `Nadi.app`. Safari may have unpacked it already.
-3. Drag `Nadi.app` into Applications.
-4. Open Nadi from Applications. macOS blocks it the first time. Close the dialog.
-5. Open System Settings, go to Privacy & Security, scroll down to the message about Nadi and click Open Anyway. Confirm with your password or Touch ID.
+1. Download `Nadi-<version>.zip` from [Releases](https://github.com/theyudhiztira/nadi/releases).
+2. Unpack `Nadi.app` and drag it into `Applications`.
+3. Open `Nadi` from `Applications`. macOS blocks the first launch because the app is ad-hoc signed, not notarized. Close the dialog, open System Settings > Privacy & Security, and click Open Anyway.
 
-Nadi then opens normally from now on. It has no Dock icon: look for it in the menu bar.
-
-macOS blocks the first launch because Nadi is signed ad hoc, not with a paid Apple Developer ID, and Apple has not notarized it. The source of every release is in this repository, and you can build the same app yourself (see below).
-
-If you prefer the terminal, this removes the download flag instead of steps 4 and 5:
+Or strip the quarantine flag from the terminal:
 
 ```sh
 xattr -dr com.apple.quarantine /Applications/Nadi.app
 ```
 
-Each release also has a `.sha256` file. To check the download, put both files in the same folder and run:
+Verify a download against its checksum file:
 
 ```sh
 shasum -a 256 -c Nadi-<version>.zip.sha256
 ```
-
-It prints `OK` when the ZIP matches.
 
 ## Build and run
 
@@ -52,73 +41,63 @@ scripts/bundle.sh
 open Nadi.app
 ```
 
-`scripts/bundle.sh` builds a release binary, wraps it into `Nadi.app` and signs it ad hoc. The app has no Dock icon: look for it in the menu bar. Quit it from the footer of the panel.
-
-To run the tests:
+Run tests:
 
 ```sh
 swift test
 ```
 
-Two debugging flags skip the menu bar and print to the terminal or a file:
+Debug flags:
 
 ```sh
 .build/release/Nadi --dump 5                              # five snapshots on stdout
-.build/release/Nadi --render-panel panel.png light        # panel as an image, or `dark`
+.build/release/Nadi --render-panel panel.png light        # panel PNG (`light` or `dark`)
+.build/release/Nadi --render-settings settings.png light  # settings PNGs (`light` or `dark`)
 ```
 
-## What works today
+## Features
 
-- Menu bar graphs for CPU, RAM, CPU temperature, power and network. Power shows the watts going into the battery while charging, and the whole-system draw otherwise.
-- A panel with sections for CPU (per core, efficiency and performance cores), memory (pressure and swap), temperatures, GPU, fans, power and battery, network, disk and the top processes by CPU or memory. Charts cover the last 10 minutes.
-- Sensors that need no `sudo`.
-- An "Open at login" checkbox in the panel. It registers Nadi.app with macOS, so it shows up in System Settings under General, Login Items, where it can also be turned off. Move Nadi.app to its final folder before you turn it on.
-- A "Keep awake with lid closed" switch in the panel. It runs `pmset -a disablesleep`; a one-time password installs `/etc/sudoers.d/nadi-keep-awake`, limited to those two `pmset` commands. Nadi turns it off on quit and at next launch. Remove the rule with `sudo rm /etc/sudoers.d/nadi-keep-awake`.
-- An update notice that checks GitHub Releases at launch and once a day, with a Download button. It does not install anything itself.
-- Measured on the M1 Max: 0.71 to 0.73% CPU over 90 seconds and 42 MB of memory with the panel closed.
+- Menu bar strip with live graphs and values. Pick, reorder or hide metrics in Settings; if all metrics are hidden, the app icon stays in the menu bar.
+- Panel with 10-minute history charts, per-core efficiency and performance bars, memory pressure and swap, CPU/GPU temperatures, GPU power, fans, adapter and battery stats, network, disk and top processes with app icons.
+- Keep-awake toggle in the panel for closed-lid operation (`pmset -a disablesleep`). The first toggle prompts once for admin approval to install `/etc/sudoers.d/nadi-keep-awake` for those two `pmset` commands. Nadi resets sleep on quit and on launch recovery. Remove the rule anytime with `sudo rm /etc/sudoers.d/nadi-keep-awake`.
+- Settings window for menu bar metrics, refresh interval (0.5 to 5 s), Celsius or Fahrenheit, and Open at login (`SMAppService`).
+- Update notice that checks GitHub Releases on launch and once a day, with a Download button.
+- Sensors run without `sudo`. Measured on an M1 Max with the panel closed: 0.71 to 0.73% CPU over 90 s and 42 MB of memory.
 
-Not built yet, in this order: a 24-hour history stored in SQLite and a settings window (choose menu bar metrics, refresh rate, °C or °F).
+Not built yet: 24-hour history in SQLite.
 
 ## Private APIs
 
-Some readings have no public API, so Nadi reads them through undocumented interfaces:
-
 | Reading | Source |
 |---|---|
-| CPU and GPU temperature, fan speed, system power | SMC, through the `AppleSMC` IOKit service |
+| CPU/GPU temperature, fan speed, system power | `AppleSMC` IOKit service |
 | CPU temperature fallback | `IOHIDEventSystemClient` |
 | GPU power | `IOReport` |
 
-Everything else (CPU load, memory, network, disk, battery, processes) uses public APIs and IOKit properties.
-
-What this means for you:
-
-- A macOS update can break a reading. Each sensor sits behind its own reader and returns nothing on failure, so the panel shows a dash for that metric and the app keeps running.
-- An app that uses these interfaces cannot go on the Mac App Store.
-- On macOS 27.0.1 the `IOReport` energy counters for CPU, ANE and DRAM do not move for an unprivileged process, so Nadi does not show them. CPU and system power come from SMC keys instead.
+CPU load, memory, network, disk, battery and processes use public APIs and IOKit properties. If a private sensor fails on a macOS update, that metric shows `--` and the rest of the app keeps working.
 
 ## Privacy
 
-Nadi makes one request to GitHub's Releases API at launch and every 24 hours, sending no data beyond the request itself. It collects no telemetry. Samples stay in memory.
+Nadi queries GitHub's Releases API on launch and every 24 hours to check for updates. It sends no other network traffic, collects no telemetry and keeps sensor samples in memory.
 
 ## Releases
 
-Pushing a version tag builds the ZIP on GitHub Actions and opens a draft release. The steps are in [docs/RELEASING.md](docs/RELEASING.md). A copy you build yourself with `scripts/bundle.sh` has no download flag and opens without the Gatekeeper prompt.
+Pushing a `v*` tag builds the ZIP on GitHub Actions and opens a draft release. See [docs/RELEASING.md](docs/RELEASING.md).
 
 ## Project layout
 
 | Path | Contents |
 |---|---|
-| `Sources/NadiCore` | Models, ring buffers, counter math, formatting, the sampler. No AppKit or IOKit imports, so it is unit-tested. |
-| `Sources/NadiSensors` | The real sensor readers. |
-| `Sources/CPrivate` | C declarations for the private interfaces. |
-| `Sources/NadiApp` | Status item, menu bar renderer and SwiftUI panel. |
+| `Sources/NadiCore` | Models, ring buffers, counter math, formatting, settings and sampler (no AppKit/IOKit). |
+| `Sources/NadiSensors` | Sensor readers. |
+| `Sources/CPrivate` | C headers for private IOKit/SMC interfaces. |
+| `Sources/NadiApp` | Status item, menu bar renderer, panel and Settings window. |
 | `Tests/NadiCoreTests` | Unit tests (Swift Testing). |
-| `scripts/` | `bundle.sh` builds and signs `Nadi.app`. |
+| `scripts/` | `bundle.sh` and `make-zip.sh`. |
 
 ## Contributing
 
-Read [CONTRIBUTING.md](CONTRIBUTING.md) first. Security issues go through [SECURITY.md](SECURITY.md), not the public tracker.
+See [CONTRIBUTING.md](CONTRIBUTING.md). Report security issues via [SECURITY.md](SECURITY.md).
 
 ## License
 

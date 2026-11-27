@@ -18,10 +18,13 @@ enum PanelSnapshot {
               let downloadURL = URL(string: "https://github.com/theyudhiztira/nadi/releases/download/v0.0.1/Nadi-0.0.1.zip") else { return }
         let update = AvailableUpdate(version: "0.2.0", pageURL: pageURL, downloadURL: downloadURL)
         let appearance = NSAppearance(named: dark ? .darkAqua : .aqua)!
+        let settings = SettingsStore(defaults: UserDefaults(suiteName: "Nadi.PanelRender.\(UUID().uuidString)")!)
+        let keepAwake = KeepAwake()
+        await keepAwake.refresh()
         let content = VStack(spacing: 0) {
-            PanelTopRows(update: update, currentVersion: "0.1.0", keepAwake: KeepAwake())
-            PanelSections(store: store)
-            PanelBottomRows(loginItem: LoginItem(), onQuit: {})
+            PanelTopRows(update: update, currentVersion: "0.1.0")
+            PanelSections(store: store, temperatureUnit: settings.settings.temperatureUnit)
+            PanelBottomRows(keepAwake: keepAwake, onQuit: {}, onOpenSettings: {})
         }
         .frame(width: PanelView.width)
         .fixedSize(horizontal: false, vertical: true)

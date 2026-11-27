@@ -11,26 +11,34 @@ final class StatusItemController {
     private let sampler: Sampler
     private let keepAwake: KeepAwake
     private let updateChecker: UpdateChecker
+    private let settings: SettingsStore
     private let loginItem = LoginItem()
+    private lazy var emptyStatusIcon: NSImage = {
+        let image = ApplicationIcon.image.copy() as? NSImage ?? NSImage(size: NSSize(width: 18, height: 18))
+        image.size = NSSize(width: 18, height: 18)
+        image.isTemplate = false
+        return image
+    }()
     private var panel: StatusPanel?
     private var outsideClickMonitor: Any?
-    private var metrics: [MetricID] = MetricID.menuBarDefaults
-    private var temperatureUnit: TemperatureUnit = .celsius
     private var lastRendered: [MenuBarRenderer.Item] = []
     private var appearanceObservation: NSKeyValueObservation?
     private var appearanceName: NSAppearance.Name?
 
-    init(store: LiveStore, sampler: Sampler, keepAwake: KeepAwake, updateChecker: UpdateChecker) {
+    init(store: LiveStore, sampler: Sampler, keepAwake: KeepAwake, updateChecker: UpdateChecker, settings: SettingsStore) {
         self.store = store
         self.sampler = sampler
         self.keepAwake = keepAwake
         self.updateChecker = updateChecker
+        self.settings = settings
         if let button = item.button {
             button.imagePosition = .imageOnly
             button.target = self
             button.action = #selector(togglePanel)
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
         }
+        applySettings()
+        observeSettings()
         render()
         observe()
         // The pre-rendered bitmap uses green for charging, so redraw on light/dark switches.
@@ -50,6 +58,14 @@ final class StatusItemController {
         DispatchQueue.main.async { [weak self] in self?.preparePanel() }
     }
 
+    func openSettings() {
+        closePanel()
+        SettingsWindowController.show(settings: settings, loginItem: loginItem, live: store)
+    }
+
+    private var metrics: [MetricID] { settings.settings.menuBarMetrics }
+    private var temperatureUnit: TemperatureUnit { settings.settings.temperatureUnit }
+
     @objc private func togglePanel() {
         if panel?.isVisible == true { closePanel() } else { showPanel() }
     }
@@ -61,6 +77,7 @@ final class StatusItemController {
         loginItem.refresh()
         Task { await keepAwake.refresh() }
         panel.makeKeyAndOrderFront(nil)
+        panel.makeFirstResponder(nil)
         item.button?.highlight(true)
 
         Task { await sampler.setDetailed(true) }
@@ -107,10 +124,11 @@ final class StatusItemController {
     private func makePanelView() -> PanelView {
         PanelView(
             store: panelStore,
-            loginItem: loginItem,
             keepAwake: keepAwake,
             updateChecker: updateChecker,
-            onQuit: { NSApp.terminate(nil) }
+            onQuit: { NSApp.terminate(nil) },
+            settings: settings,
+            onOpenSettings: { [weak self] in self?.openSettings() }
         )
     }
 
@@ -129,9 +147,41 @@ final class StatusItemController {
         }
     }
 
+    private func observeSettings() {
+        withObservationTracking {
+            _ = settings.settings
+        } onChange: { [weak self] in
+            Task { @MainActor in
+                guard let self else { return }
+                self.applySettings()
+                self.lastRendered = []
+                self.render()
+                self.observeSettings()
+            }
+        }
+    }
+
+    private func applySettings() {
+        let interval = settings.settings.interval
+        let metrics = settings.settings.menuBarMetrics
+        Task {
+            await sampler.setInterval(interval)
+            await sampler.setMenuBarMetrics(metrics)
+        }
+    }
+
     private func render() {
+        guard let button = item.button else { return }
+        if metrics.isEmpty {
+            if button.image !== emptyStatusIcon { button.image = emptyStatusIcon }
+            if item.length != 26 { item.length = 26 }
+            button.setAccessibilityLabel("Nadi")
+            lastRendered = []
+            return
+        }
+        if button.image === emptyStatusIcon { button.image = nil }
         let items = metrics.map { MenuBarRenderer.Item(metric: $0, store: store, temperatureUnit: temperatureUnit) }
-        guard items != lastRendered, let button = item.button else { return }
+        guard items != lastRendered else { return }
         lastRendered = items
         let scale = button.window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2
         let image = renderer.image(for: items, appearance: button.effectiveAppearance, scale: scale)

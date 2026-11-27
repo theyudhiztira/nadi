@@ -40,6 +40,7 @@ final class MenuBarRenderer {
         var widestValue: String
         var graph: Graph
         var tint: Tint
+        var accessibilityUnit: String? = nil
     }
 
     static let sampleCount = 20
@@ -223,12 +224,16 @@ extension MenuBarRenderer.Item {
         switch metric {
         case .power:
             self = Self.power(latest?.powerDisplay)
+        case .cpuTemperature, .gpuTemperature:
+            self.init(label: metric.label, widestLabel: metric.label, value: formatted,
+                      widestValue: metric.widestValue, graph: .line(quantized), tint: .normal)
+            accessibilityUnit = temperatureUnit == .celsius ? "°C" : "°F"
         case .network:
             let up = latest?.network.map { MetricFormatter.bytesPerSecond($0.outPerSecond) } ?? MetricFormatter.missing
             let down = latest?.network.map { MetricFormatter.bytesPerSecond($0.inPerSecond) } ?? MetricFormatter.missing
             self.init(label: "", widestLabel: "", value: "", widestValue: "",
                       graph: .stacked(top: "↑ \(up)", bottom: "↓ \(down)", widest: "↓ 999 KB/s"), tint: .normal)
-        case .memory, .cpuTemperature, .gpuTemperature, .fan, .cpuPower, .gpuPower, .networkIn, .networkOut,
+        case .memory, .fan, .cpuPower, .gpuPower, .networkIn, .networkOut,
              .diskRead, .diskWrite:
             self.init(label: metric.label, widestLabel: metric.label, value: formatted,
                       widestValue: metric.widestValue, graph: .line(quantized), tint: .normal)
@@ -269,11 +274,13 @@ extension MenuBarRenderer.Item {
     var accessibilityText: String {
         switch graph {
         case .stacked(let top, let bottom, _):
-            "Network upload \(top.dropFirst(2)), download \(bottom.dropFirst(2))"
+            return "Network upload \(top.dropFirst(2)), download \(bottom.dropFirst(2))"
         default:
             switch tint {
-            case .good: "Charging \(value)"
-            case .normal: "\(label) \(value)"
+            case .good: return "Charging \(value)"
+            case .normal:
+                let spokenValue = accessibilityUnit == nil ? value : value.replacingOccurrences(of: "°", with: "")
+                return "\(label) \(spokenValue)\(accessibilityUnit.map { " \($0)" } ?? "")"
             }
         }
     }

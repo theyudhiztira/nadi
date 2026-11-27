@@ -16,6 +16,7 @@ struct HistoryChart: View {
 
     let store: LiveStore
     let series: [Series]
+    var temperatureUnit: TemperatureUnit = .celsius
 
     var body: some View {
         let raw = series.map { store.recent($0.metric, count: Self.pointCount * Self.bucketSize) }
@@ -116,7 +117,7 @@ struct HistoryChart: View {
             // The menu bar's compact fan format ("1.6k") would disagree with the rpm rows under the chart.
             let value = item.metric == .fan
                 ? "\(point.raw.formatted(.number.precision(.fractionLength(0)))) rpm"
-                : MetricFormatter.format(point.raw, for: item.metric)
+                : MetricFormatter.format(point.raw, for: item.metric, temperatureUnit: temperatureUnit)
             return series.count > 1 ? "\(item.name) \(value)" : value
         }
         return (values + [Self.age(ofIndex: index)]).joined(separator: " · ")

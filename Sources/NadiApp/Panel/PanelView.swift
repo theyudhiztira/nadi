@@ -6,20 +6,22 @@ import SwiftUI
 /// The dropdown panel. One scrolling column; each section has its own shape for what it shows.
 struct PanelView: View {
     let store: LiveStore
-    let loginItem: LoginItem
     let keepAwake: KeepAwake
     let updateChecker: UpdateChecker
     let onQuit: () -> Void
+    let settings: SettingsStore
+    let onOpenSettings: () -> Void
 
     var body: some View {
         VStack(spacing: 0) {
             PanelTopRows(
                 update: updateChecker.available,
-                currentVersion: currentVersion,
-                keepAwake: keepAwake
+                currentVersion: currentVersion
             )
-            ScrollView { PanelSections(store: store) }
-            PanelBottomRows(loginItem: loginItem, onQuit: onQuit)
+            ScrollView {
+                PanelSections(store: store, temperatureUnit: settings.settings.temperatureUnit)
+            }
+            PanelBottomRows(keepAwake: keepAwake, onQuit: onQuit, onOpenSettings: onOpenSettings)
         }
         .frame(width: PanelView.width)
     }
@@ -45,39 +47,70 @@ extension Color {
 struct PanelTopRows: View {
     let update: AvailableUpdate?
     let currentVersion: String?
-    let keepAwake: KeepAwake
 
     var body: some View {
-        VStack(spacing: 0) {
-            if let update, let currentVersion {
-                UpdateRow(update: update, currentVersion: currentVersion)
-            }
-            KeepAwakeRow(keepAwake: keepAwake)
+        if let update, let currentVersion {
+            UpdateRow(update: update, currentVersion: currentVersion)
         }
     }
 }
 
 struct PanelBottomRows: View {
-    let loginItem: LoginItem
+    let keepAwake: KeepAwake
     let onQuit: () -> Void
+    let onOpenSettings: () -> Void
 
     var body: some View {
         VStack(spacing: 0) {
-            LoginItemRow(loginItem: loginItem)
-            PanelFooter(onQuit: onQuit)
+            KeepAwakeRow(keepAwake: keepAwake)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background {
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(Color.primary.opacity(0.05))
+                }
+                .overlay {
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(Color.primary.opacity(0.08), lineWidth: 0.5)
+                }
+                .padding(.horizontal, 14)
+                .padding(.top, 12)
+
+            HStack(spacing: 8) {
+                Button(action: onOpenSettings) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "gearshape")
+                        Text("Settings")
+                    }
+                    .font(.system(size: 13, weight: .medium))
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 32)
+                }
+                .buttonStyle(PanelFooterButtonStyle())
+
+                Button(action: onQuit) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "power")
+                        Text("Quit")
+                    }
+                    .font(.system(size: 13, weight: .medium))
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 32)
+                }
+                .buttonStyle(PanelFooterButtonStyle())
+                .keyboardShortcut("q")
+            }
+            .padding(.horizontal, 14)
+            .padding(.top, 8)
+            .padding(.bottom, 12)
         }
-        .padding(.horizontal, 14)
-        .padding(.top, 6)
-        .padding(.bottom, 6)
-        .overlay(alignment: .top) {
-            Color.primary.opacity(0.11).frame(height: 0.5)
-        }
-        .padding(.top, 16)
     }
 }
 
 struct PanelSections: View {
     let store: LiveStore
+    var temperatureUnit: TemperatureUnit = .celsius
     @ViewState private var ranking: ProcessRanking = .cpu
 
     var body: some View {
@@ -93,6 +126,7 @@ struct PanelSections: View {
             disk(s)
             processes(s)
         }
+        .padding(.bottom, 12)
         .frame(maxWidth: .infinity)
     }
 
@@ -157,12 +191,12 @@ struct PanelSections: View {
         PanelSection(title: "Temperatures") {
             VStack(spacing: 0) {
                 HStack(alignment: .bottom, spacing: 18) {
-                    LeadNumber(reading: MetricFormatter.reading(s?.cpuTemperature, for: .cpuTemperature), label: "CPU", tint: .accentColor)
-                    LeadNumber(reading: MetricFormatter.reading(s?.gpuTemperature, for: .gpuTemperature), label: "GPU", tint: .panelSecondary, secondary: true)
+                    LeadNumber(reading: MetricFormatter.reading(s?.cpuTemperature, for: .cpuTemperature, temperatureUnit: temperatureUnit), label: "CPU", tint: .accentColor)
+                    LeadNumber(reading: MetricFormatter.reading(s?.gpuTemperature, for: .gpuTemperature, temperatureUnit: temperatureUnit), label: "GPU", tint: .panelSecondary, secondary: true)
                     Spacer(minLength: 0)
                 }
                 .padding(.horizontal, 14)
-                HistoryChart(store: store, series: [.init(metric: .cpuTemperature, name: "CPU"), .init(metric: .gpuTemperature, name: "GPU")])
+                HistoryChart(store: store, series: [.init(metric: .cpuTemperature, name: "CPU"), .init(metric: .gpuTemperature, name: "GPU")], temperatureUnit: temperatureUnit)
                     .frame(height: 46)
                     .padding(.top, 10)
             }
@@ -314,12 +348,14 @@ struct PanelSections: View {
                             .interpolation(.high)
                             .frame(width: 16, height: 16)
                             .accessibilityHidden(true)
-                        Text(process.name)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .layoutPriority(1)
-                        Spacer()
+                        GeometryReader { geometry in
+                            Text(middleTruncated(process.name, width: min(geometry.size.width, 160)))
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .layoutPriority(1)
+                        }
+                        .frame(maxWidth: .infinity)
                         Text(ranking == .cpu
                              ? "\(Int((process.cpu * 100).rounded()))%"
                              : MetricFormatter.bytes(Double(process.memoryBytes), binary: true))
@@ -337,6 +373,22 @@ struct PanelSections: View {
         .padding(.horizontal, 14)
         .padding(.top, 20)
         .accessibilityElement(children: .contain)
+    }
+
+    private func middleTruncated(_ name: String, width: CGFloat) -> String {
+        let font = NSFont.systemFont(ofSize: 12)
+        func fits(_ text: String) -> Bool {
+            (text as NSString).size(withAttributes: [.font: font]).width <= width
+        }
+        guard !fits(name) else { return name }
+        let characters = Array(name)
+        for retained in stride(from: characters.count - 1, through: 0, by: -1) {
+            let leading = Int(Double(retained) * 0.7)
+            let trailing = retained - leading
+            let candidate = String(characters.prefix(leading)) + "…" + String(characters.suffix(trailing))
+            if fits(candidate) { return candidate }
+        }
+        return "…"
     }
 
     private func rpm(_ value: Double) -> String {
@@ -586,10 +638,10 @@ private struct KeepAwakeRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            HStack {
+            HStack(alignment: .center) {
                 Text("Keep awake with lid closed")
                     .font(.system(size: 13))
-                Spacer()
+                Spacer(minLength: 8)
                 Toggle(
                     "Keep awake with lid closed",
                     isOn: Binding(
@@ -608,13 +660,6 @@ private struct KeepAwakeRow: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .controlSize(.small)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .overlay(alignment: .bottom) {
-            Color.primary.opacity(0.11).frame(height: 0.5)
-        }
     }
 
     private var note: String? {
@@ -625,67 +670,20 @@ private struct KeepAwakeRow: View {
     }
 }
 
-private struct LoginItemRow: View {
-    let loginItem: LoginItem
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Toggle("Open at login", isOn: Binding(get: { loginItem.isEnabled }, set: { loginItem.setEnabled($0) }))
-                    .toggleStyle(.checkbox)
-                    .disabled(!loginItem.isAvailable || loginItem.needsApproval)
-                Spacer()
-                if loginItem.needsApproval {
-                    Button("Login Items…") { loginItem.openLoginItemsSettings() }
-                }
+private struct PanelFooterButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundStyle(Color.primary.opacity(0.75))
+            .background {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color.primary.opacity(configuration.isPressed ? 0.12 : 0.06))
             }
-            .frame(height: 24)
-            if let note {
-                Text(note)
-                    .font(.system(size: 11))
-                    .foregroundStyle(Color.panelSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
+            .overlay {
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color.primary.opacity(0.10), lineWidth: 0.5)
             }
-        }
-        .controlSize(.small)
+            .contentShape(RoundedRectangle(cornerRadius: 8))
     }
-
-    private var note: String? {
-        if !loginItem.isAvailable { return "Requires Nadi.app." }
-        if loginItem.needsApproval { return "Disabled in Login Items." }
-        return loginItem.error
-    }
-}
-
-private struct PanelFooter: View {
-    let onQuit: () -> Void
-
-    var body: some View {
-        HStack {
-            // TODO(phase 6): open the settings window.
-            Button("Settings") {}
-                .disabled(true)
-            Spacer()
-            // Selectable so a bug report can paste it.
-            Text(Self.version)
-                .font(.system(size: 11).monospacedDigit())
-                .foregroundStyle(Color.panelSecondary)
-                .textSelection(.enabled)
-            Button("Quit", action: onQuit)
-                .keyboardShortcut("q")
-        }
-        .font(.system(size: 11))
-        .frame(height: 28)
-        .controlSize(.small)
-    }
-
-    /// "v0.0.1 (1)" from Info.plist. A bare binary outside Nadi.app has no Info.plist.
-    private static let version: String = {
-        let info = Bundle.main.infoDictionary
-        guard let short = info?["CFBundleShortVersionString"] as? String else { return "Dev build" }
-        let build = info?["CFBundleVersion"] as? String
-        return build.map { "v\(short) (\($0))" } ?? "v\(short)"
-    }()
 }
 
 extension MemoryPressure {

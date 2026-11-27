@@ -8,11 +8,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let sampler = Sampler(sensors: .system())
     private let keepAwake = KeepAwake()
     private let updateChecker = UpdateChecker()
+    private let settings = SettingsStore()
     private var statusItem: StatusItemController?
     private var sampling: Task<Void, Never>?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        statusItem = StatusItemController(store: store, sampler: sampler, keepAwake: keepAwake, updateChecker: updateChecker)
+        statusItem = StatusItemController(store: store, sampler: sampler, keepAwake: keepAwake,
+                                          updateChecker: updateChecker, settings: settings)
         Task { await keepAwake.recoverOnLaunch() }
         updateChecker.start()
         sampling = Task { [sampler, store] in
@@ -25,12 +27,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         updateChecker.cancel()
         keepAwake.releaseOnQuit()
     }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        // Reopening is the fallback when macOS hides a crowded status item.
+        statusItem?.openSettings()
+        return true
+    }
 }
 
 // `Nadi --render-panel <file.png> [light|dark]` samples for a few seconds and writes the panel content as an image.
 if let index = CommandLine.arguments.firstIndex(of: "--render-panel"), CommandLine.arguments.count > index + 1 {
     let dark = CommandLine.arguments.dropFirst(index + 2).first == "dark"
     await PanelSnapshot.write(to: CommandLine.arguments[index + 1], dark: dark)
+    exit(0)
+}
+
+if let index = CommandLine.arguments.firstIndex(of: "--render-settings"), CommandLine.arguments.count > index + 1 {
+    let dark = CommandLine.arguments.dropFirst(index + 2).first == "dark"
+    await SettingsSnapshot.write(to: CommandLine.arguments[index + 1], dark: dark)
     exit(0)
 }
 

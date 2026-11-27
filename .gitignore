@@ -9,3 +9,5 @@ spikes/*.app/
 .vscode/
 .idea/
 dist/
+design/
+graphify-out/

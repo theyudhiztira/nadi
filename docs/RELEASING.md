@@ -4,7 +4,7 @@ Releases are ad-hoc signed ZIPs on GitHub Releases. There is no Apple Developer 
 
 Why a ZIP and not a DMG: on macOS 27, Finder refuses to copy an app that Apple has not notarized from a disk image into Applications ("This Mac could not verify the app, so nothing was installed"). An app unpacked from a ZIP copies in fine and only asks for Open Anyway on first launch.
 
-`Resources/Info.plist` holds the version. The build number is the commit count, set by `scripts/bundle.sh`, so the panel footer reads like `v0.1.0 (64)`.
+`Resources/Info.plist` holds the version. The build number is the commit count, set by `scripts/bundle.sh`, so Settings > General reads like `v0.1.0 (64)`.
 
 ## Cut a release
 
