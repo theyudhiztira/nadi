@@ -105,7 +105,7 @@ struct PanelSections: View {
         let speeds = s?.fanRPM
         PanelSection(title: "Fans", value: speeds?.max().map(rpm) ?? MetricFormatter.missing) {
             if let speeds, speeds.isEmpty {
-                Note("This Mac has no fans.")
+                Note("No fans")
             } else {
                 HistoryChart(store: store, series: [.init(metric: .fan, name: "Fan")])
                 Facts((speeds ?? []).enumerated().map { ("Fan \($0.offset + 1)", Optional(rpm($0.element))) })
@@ -116,17 +116,17 @@ struct PanelSections: View {
     @ViewBuilder
     private func power(_ s: Snapshot?) -> some View {
         let p = s?.power
-        PanelSection(title: "Power & Battery", value: format(p?.menuBarWatts, .power)) {
+        PanelSection(title: "Power", value: format(p?.menuBarWatts, .power)) {
             if store.latest != nil, p == nil {
-                Note("No battery found.")
+                Note("No battery")
             } else {
-                HistoryChart(store: store, series: [.init(metric: .power, name: p?.externalConnected == false ? "System draw" : "Adapter input")])
+                HistoryChart(store: store, series: [.init(metric: .power, name: p?.externalConnected == false ? "System" : "Adapter")])
                 Facts([
-                    (p?.externalConnected == false ? "System draw" : "Adapter input", p?.menuBarWatts.map(MetricFormatter.watts)),
-                    ("Adapter rating", p?.externalConnected == true ? p?.adapterRatingWatts.map(MetricFormatter.watts) : nil),
+                    (p?.externalConnected == false ? "System" : "Adapter", p?.menuBarWatts.map(MetricFormatter.watts)),
+                    ("Rated", p?.externalConnected == true ? p?.adapterRatingWatts.map(MetricFormatter.watts) : nil),
                     ("Battery", p?.batteryWatts.map { String(format: "%+.1fW", $0) }),
                     ("CPU", s?.energy?.cpuWatts.map(MetricFormatter.watts)),
-                    ("Whole system", s?.energy?.systemWatts.map(MetricFormatter.watts)),
+                    ("System", s?.energy?.systemWatts.map(MetricFormatter.watts)),
                     ("Charge", p?.percent.map { "\($0)%" }),
                     ("State", p.map(chargeState)),
                     (p?.isCharging == true ? "Time to full" : "Time left", p?.timeRemainingMinutes.map(duration)),
@@ -160,7 +160,7 @@ struct PanelSections: View {
     private func processes(_ s: Snapshot?) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("Top processes").font(.system(size: 13, weight: .semibold))
+                Text("Processes").font(.system(size: 13, weight: .semibold))
                 Spacer()
                 Picker("Sort by", selection: $ranking) {
                     Text("CPU").tag(ProcessRanking.cpu)
@@ -173,7 +173,12 @@ struct PanelSections: View {
             if let usage = s?.processes {
                 let top = TopProcesses.top(5, of: usage, by: ranking)
                 ForEach(top) { process in
-                    HStack {
+                    HStack(spacing: 6) {
+                        Image(nsImage: ProcessIcon.icon(for: process.pid, name: process.name))
+                            .resizable()
+                            .interpolation(.high)
+                            .frame(width: 16, height: 16)
+                            .accessibilityHidden(true)
                         Text(process.name).lineLimit(1).truncationMode(.middle)
                         Spacer()
                         Text(ranking == .cpu
@@ -185,7 +190,7 @@ struct PanelSections: View {
                     .font(.system(size: 12))
                 }
             } else {
-                Note("Measuring processes…")
+                Note("Measuring…")
             }
         }
     }
@@ -347,7 +352,7 @@ private struct LoginItemRow: View {
                     .disabled(!loginItem.isAvailable || loginItem.needsApproval)
                 Spacer()
                 if loginItem.needsApproval {
-                    Button("Open Login Items") { loginItem.openLoginItemsSettings() }
+                    Button("Login Items…") { loginItem.openLoginItemsSettings() }
                 }
             }
             if let note {
@@ -363,9 +368,9 @@ private struct LoginItemRow: View {
     }
 
     private var note: String? {
-        if !loginItem.isAvailable { return "Only works when Nadi runs from Nadi.app." }
-        if loginItem.needsApproval { return "Nadi is turned off in Login Items. Turn it back on there." }
-        return loginItem.error.map { "Could not change it: \($0)" }
+        if !loginItem.isAvailable { return "Requires Nadi.app." }
+        if loginItem.needsApproval { return "Disabled in Login Items." }
+        return loginItem.error
     }
 }
 
@@ -377,16 +382,13 @@ private struct PanelFooter: View {
             // TODO(phase 6): open the settings window.
             Button("Settings") {}
                 .disabled(true)
-            Text("Coming soon")
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
             Spacer()
             // Selectable so a bug report can paste it.
             Text(Self.version)
                 .font(.system(size: 11).monospacedDigit())
                 .foregroundStyle(.secondary)
                 .textSelection(.enabled)
-            Button("Quit Nadi", action: onQuit)
+            Button("Quit", action: onQuit)
                 .keyboardShortcut("q")
         }
         .controlSize(.small)

@@ -38,7 +38,7 @@ struct HistoryChart: View {
         Group {
             if points.isEmpty {
                 Text(store.latest == nil || store.recent(series[0].metric, count: 3).count < 3
-                     ? "Collecting readings…" : "Not available on this Mac")
+                     ? "Collecting…" : "Unavailable")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
