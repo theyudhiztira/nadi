@@ -6,11 +6,15 @@ import NadiSensors
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let store = LiveStore()
     private let sampler = Sampler(sensors: .system())
+    private let keepAwake = KeepAwake()
+    private let updateChecker = UpdateChecker()
     private var statusItem: StatusItemController?
     private var sampling: Task<Void, Never>?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        statusItem = StatusItemController(store: store, sampler: sampler)
+        statusItem = StatusItemController(store: store, sampler: sampler, keepAwake: keepAwake, updateChecker: updateChecker)
+        Task { await keepAwake.recoverOnLaunch() }
+        updateChecker.start()
         sampling = Task { [sampler, store] in
             await sampler.run(into: store)
         }
@@ -18,6 +22,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         sampling?.cancel()
+        updateChecker.cancel()
+        keepAwake.releaseOnQuit()
     }
 }
 

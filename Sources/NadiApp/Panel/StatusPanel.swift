@@ -4,8 +4,10 @@ import SwiftUI
 /// Borderless panel that drops from the status item, like the system's own menu bar panels.
 final class StatusPanel: NSPanel {
     var onCancel: (() -> Void)?
+    private let hosting: NSHostingView<PanelView>
 
-    init(rootView: some View) {
+    init(rootView: PanelView) {
+        hosting = NSHostingView(rootView: rootView)
         super.init(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: true)
         isFloatingPanel = true
         level = .statusBar
@@ -14,6 +16,8 @@ final class StatusPanel: NSPanel {
         backgroundColor = .clear
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
         hidesOnDeactivate = false
+        // AppKit fixes the panel size; intrinsic measurement can trigger a full-tree layout.
+        hosting.sizingOptions = []
 
         // The menu material is the one translucent surface in Nadi; it matches the system's menu bar panels.
         let background = NSVisualEffectView()
@@ -24,7 +28,6 @@ final class StatusPanel: NSPanel {
         background.layer?.masksToBounds = true
         contentView = background
 
-        let hosting = NSHostingView(rootView: rootView)
         hosting.translatesAutoresizingMaskIntoConstraints = false
         background.addSubview(hosting)
         NSLayoutConstraint.activate([

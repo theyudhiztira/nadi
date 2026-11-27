@@ -8,6 +8,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ### Added
 
 - "Open at login" checkbox in the panel, backed by `SMAppService`. When Nadi is turned off in System Settings, the panel says so and links to Login Items.
+- Keep-awake switch in the panel and a daily update notice.
+
+### Removed
+
+- Red tint for metrics over their thresholds and yellow tint for slow charging.
 
 ## [0.0.1] - 2026-10-29
 

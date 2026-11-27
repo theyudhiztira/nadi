@@ -1,4 +1,3 @@
-import Charts
 import NadiCore
 import SwiftUI
 
@@ -17,117 +16,108 @@ struct HistoryChart: View {
 
     let store: LiveStore
     let series: [Series]
-    var alerting = false
-    @ViewState private var hovered: Int?
-    @ViewState private var tooltipWidth: CGFloat = 0
-
-    private struct Point: Identifiable {
-        var series: String
-        var metric: MetricID
-        var index: Int
-        /// 0...1 on the chart's scale.
-        var value: Double
-        /// The bucket's average in the metric's own unit, for the hover readout.
-        var raw: Double
-        var id: String { "\(series)-\(index)" }
-    }
 
     var body: some View {
-        let points = makePoints()
-        let hoveredPoints = hovered.map { index in points.filter { $0.index == index } } ?? []
+        let raw = series.map { store.recent($0.metric, count: Self.pointCount * Self.bucketSize) }
+        let points = ChartData.points(
+            raw,
+            metrics: series.map(\.metric),
+            adapterRatingWatts: store.latest?.power?.adapterRatingWatts,
+            bucketSize: Self.bucketSize,
+            pointCount: Self.pointCount
+        )
         Group {
             if points.isEmpty {
                 Text(store.latest == nil || store.recent(series[0].metric, count: 3).count < 3
                      ? "Collecting readings…" : "Not available on this Mac")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 11))
+                    .foregroundStyle(Color.panelSecondary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                Chart {
-                    ForEach(points) { point in
-                        AreaMark(
-                            x: .value("Time", point.index),
-                            y: .value("Value", point.value),
-                            series: .value("Series", point.series)
-                        )
-                        .foregroundStyle(color(for: point.series).opacity(series.count > 1 ? 0 : 0.18))
-                        LineMark(
-                            x: .value("Time", point.index),
-                            y: .value("Value", point.value),
-                            series: .value("Series", point.series)
-                        )
-                        .foregroundStyle(color(for: point.series))
-                        .lineStyle(StrokeStyle(lineWidth: 1.5))
-                    }
-                    if let index = hoveredPoints.first?.index {
-                        RuleMark(x: .value("Time", index))
-                            .foregroundStyle(Color.secondary.opacity(0.5))
-                            .lineStyle(StrokeStyle(lineWidth: 1))
-                        ForEach(hoveredPoints) { point in
-                            PointMark(x: .value("Time", point.index), y: .value("Value", point.value))
-                                .foregroundStyle(color(for: point.series))
-                                .symbolSize(16)
+                Canvas { context, size in
+                    let lineWidth: CGFloat = 1.25
+                    let inset = lineWidth / 2
+                    let baselineY = size.height - 0.25
+                    var baseline = Path()
+                    baseline.move(to: CGPoint(x: 0, y: baselineY))
+                    baseline.addLine(to: CGPoint(x: size.width, y: baselineY))
+                    context.stroke(baseline, with: .color(Color.primary.opacity(0.11)), lineWidth: 0.5)
+
+                    for seriesIndex in series.indices {
+                        let color = Self.color(for: seriesIndex)
+                        let seriesPoints = points.filter { $0.series == seriesIndex }
+                        for segment in Self.segments(seriesPoints) {
+                            guard let first = segment.first, let last = segment.last else { continue }
+                            let path = Self.path(for: segment, size: size, inset: inset)
+                            if series.count == 1 && seriesIndex == 0 {
+                                var area = path
+                                area.addLine(to: CGPoint(x: Self.x(for: last.index, width: size.width), y: baselineY))
+                                area.addLine(to: CGPoint(x: Self.x(for: first.index, width: size.width), y: baselineY))
+                                area.closeSubpath()
+                                context.fill(area, with: .color(color.opacity(0.10)))
+                            }
+                            context.stroke(path, with: .color(color), lineWidth: lineWidth)
                         }
                     }
                 }
-                .chartXScale(domain: 0...(Self.pointCount - 1))
-                .chartYScale(domain: 0...1)
-                .chartXAxis(.hidden)
-                .chartYAxis(.hidden)
-                .chartLegend(.hidden)
-                .chartOverlay { proxy in
-                    GeometryReader { geometry in
-                        let plot = proxy.plotFrame.map { geometry[$0] } ?? CGRect(origin: .zero, size: geometry.size)
-                        Rectangle()
-                            .fill(.clear)
-                            .contentShape(Rectangle())
-                            .onContinuousHover { phase in
-                                switch phase {
-                                case .active(let location):
-                                    guard let x = proxy.value(atX: location.x - plot.minX, as: Double.self) else { return }
-                                    let index = min(max(Int(x.rounded()), 0), Self.pointCount - 1)
-                                    if index != hovered { hovered = index }
-                                case .ended:
-                                    hovered = nil
-                                }
-                            }
-                        // Drawn by hand: the panel never activates the app, so system tooltips from .help() don't appear.
-                        if let index = hoveredPoints.first?.index, let x = proxy.position(forX: index) {
-                            let half = tooltipWidth / 2
-                            let center = min(max(plot.minX + x, half), geometry.size.width - half)
-                            Text(readout(hoveredPoints, index: index))
-                                .font(.system(size: 11).monospacedDigit())
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 4))
-                                .shadow(color: .black.opacity(0.2), radius: 2, y: 1)
-                                .fixedSize()
-                                .onGeometryChange(for: CGFloat.self, of: \.size.width) { tooltipWidth = $0 }
-                                .position(x: center, y: -12)
-                                .allowsHitTesting(false)
-                        }
-                    }
+                .overlay {
+                    HoverLayer(
+                        points: points,
+                        series: series,
+                        pointCount: Self.pointCount,
+                        readout: { readout(points, index: $0) }
+                    )
                 }
             }
         }
-        .frame(height: 40)
+        .frame(height: 46)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(series.map(\.name).joined(separator: " and ")) over the last 10 minutes")
     }
 
-    private func color(for name: String) -> Color {
-        if alerting { return .red }
-        return name == series.first?.name ? .accentColor : .secondary
+    private static func color(for series: Int) -> Color {
+        series == 0 ? .accentColor : .panelSecondary
+    }
+
+    private static func segments(_ points: [ChartData.Point]) -> [[ChartData.Point]] {
+        var result: [[ChartData.Point]] = []
+        var segment: [ChartData.Point] = []
+        for point in points {
+            if let last = segment.last, point.index != last.index + 1 {
+                result.append(segment)
+                segment = []
+            }
+            segment.append(point)
+        }
+        if !segment.isEmpty { result.append(segment) }
+        return result
+    }
+
+    private static func path(for points: [ChartData.Point], size: CGSize, inset: CGFloat) -> Path {
+        var path = Path()
+        for (index, point) in points.enumerated() {
+            let position = CGPoint(
+                x: x(for: point.index, width: size.width),
+                y: size.height - inset - CGFloat(point.value) * (size.height - inset * 2)
+            )
+            if index == 0 { path.move(to: position) } else { path.addLine(to: position) }
+        }
+        return path
+    }
+
+    private static func x(for index: Int, width: CGFloat) -> CGFloat {
+        CGFloat(index) / CGFloat(pointCount - 1) * width
     }
 
     /// "42% · 3 min 05 s ago", or with two series "Down 14 KB/s · Up 11 KB/s · now".
-    private func readout(_ points: [Point], index: Int) -> String {
-        let values = points.map { point in
+    private func readout(_ points: [ChartData.Point], index: Int) -> String {
+        let values = points.filter { $0.index == index }.map { point in
+            let item = series[point.series]
             // The menu bar's compact fan format ("1.6k") would disagree with the rpm rows under the chart.
-            let value = point.metric == .fan
+            let value = item.metric == .fan
                 ? "\(point.raw.formatted(.number.precision(.fractionLength(0)))) rpm"
-                : MetricFormatter.format(point.raw, for: point.metric)
-            return series.count > 1 ? "\(point.series) \(value)" : value
+                : MetricFormatter.format(point.raw, for: item.metric)
+            return series.count > 1 ? "\(item.name) \(value)" : value
         }
         return (values + [Self.age(ofIndex: index)]).joined(separator: " · ")
     }
@@ -140,29 +130,66 @@ struct HistoryChart: View {
         return rest == 0 ? "\(seconds / 60) min ago" : "\(seconds / 60) min \(String(format: "%02d", rest)) s ago"
     }
 
-    /// Values are scaled with the same rules as the menu bar so both read alike.
-    private func makePoints() -> [Point] {
-        let rating = store.latest?.power?.adapterRatingWatts
-        let raw = series.map { store.recent($0.metric, count: Self.pointCount * Self.bucketSize) }
-        // Two-series charts share one scale so the lines compare.
-        let sharedPeak = raw.flatMap { $0.compactMap { $0 } }.max()
-        var points: [Point] = []
-        for (s, values) in zip(series, raw) {
-            let scaled: [Double?]
-            if series.count > 1, let sharedPeak {
-                scaled = GraphScale.fractions(values + [sharedPeak], for: s.metric, adapterRatingWatts: rating).dropLast()
-            } else {
-                scaled = GraphScale.fractions(values, for: s.metric, adapterRatingWatts: rating)
-            }
-            let averaged = Downsample.average(scaled, bucketSize: Self.bucketSize)
-            let averagedRaw = Downsample.average(values, bucketSize: Self.bucketSize)
-            let offset = Self.pointCount - averaged.count
-            for (i, (value, rawValue)) in zip(averaged, averagedRaw).enumerated() {
-                if let value, let rawValue {
-                    points.append(Point(series: s.name, metric: s.metric, index: offset + i, value: value, raw: rawValue))
+    private struct HoverLayer: View {
+        let points: [ChartData.Point]
+        let series: [Series]
+        let pointCount: Int
+        let readout: (Int) -> String
+        @ViewState private var hovered: Int?
+        @ViewState private var tooltipSize: CGSize = .zero
+
+        var body: some View {
+            GeometryReader { geometry in
+                ZStack(alignment: .topLeading) {
+                    Rectangle()
+                        .fill(.clear)
+                        .contentShape(Rectangle())
+                        .onContinuousHover { phase in
+                            switch phase {
+                            case .active(let location):
+                                guard geometry.size.width > 0 else { return }
+                                let x = location.x / geometry.size.width * CGFloat(pointCount - 1)
+                                let index = min(max(Int(x.rounded()), 0), pointCount - 1)
+                                if index != hovered { hovered = index }
+                            case .ended:
+                                hovered = nil
+                            }
+                        }
+                    Canvas { context, size in
+                        guard let hovered else { return }
+                        let hoveredPoints = points.filter { $0.index == hovered }
+                        guard !hoveredPoints.isEmpty else { return }
+                        let x = CGFloat(hovered) / CGFloat(pointCount - 1) * size.width
+                        var rule = Path()
+                        rule.move(to: CGPoint(x: x, y: 0))
+                        rule.addLine(to: CGPoint(x: x, y: size.height))
+                        context.stroke(rule, with: .color(Color.panelSecondary.opacity(0.5)), lineWidth: 1)
+                        for point in hoveredPoints {
+                            let y = size.height - 0.625 - CGFloat(point.value) * (size.height - 1.25)
+                            let dot = CGRect(x: x - 2, y: y - 2, width: 4, height: 4)
+                            context.fill(Path(ellipseIn: dot), with: .color(HistoryChart.color(for: point.series)))
+                        }
+                    }
+                    .allowsHitTesting(false)
+                    // Drawn by hand: the panel never activates the app, so system tooltips from .help() don't appear.
+                    if let hovered, points.contains(where: { $0.index == hovered }) {
+                        let x = CGFloat(hovered) / CGFloat(pointCount - 1) * geometry.size.width
+                        let halfWidth = tooltipSize.width / 2
+                        let centerX = min(max(x, halfWidth), geometry.size.width - halfWidth)
+                        let centerY = min(max(tooltipSize.height / 2, 8), geometry.size.height - tooltipSize.height / 2)
+                        Text(readout(hovered))
+                            .font(.system(size: 11).monospacedDigit())
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 4))
+                            .shadow(color: .black.opacity(0.2), radius: 2, y: 1)
+                            .fixedSize()
+                            .onGeometryChange(for: CGSize.self, of: \.size) { tooltipSize = $0 }
+                            .position(x: centerX, y: centerY)
+                            .allowsHitTesting(false)
+                    }
                 }
             }
         }
-        return points
     }
 }

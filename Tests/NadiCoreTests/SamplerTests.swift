@@ -111,24 +111,21 @@ struct SamplerTierTests {
 }
 
 struct PowerDisplayTests {
-    private func snapshot(charging: Bool, input: Double, battery: Double) -> Snapshot {
+    private func snapshot(charging: Bool, battery: Double) -> Snapshot {
         var s = Snapshot(date: Date())
         var p = PowerStatus(externalConnected: true, isCharging: charging)
-        p.adapterInputWatts = input
-        p.adapterRatingWatts = 45
         p.batteryWatts = battery
         p.systemLoadWatts = 30
         s.power = p
         return s
     }
 
-    @Test func chargingWellAndSlow() {
-        #expect(snapshot(charging: true, input: 40, battery: 22).powerDisplay == .charging(watts: 22, slow: false))
-        #expect(snapshot(charging: true, input: 15, battery: 4).powerDisplay == .charging(watts: 4, slow: true))
+    @Test func chargingShowsBatteryWatts() {
+        #expect(snapshot(charging: true, battery: 22).powerDisplay == .charging(watts: 22))
     }
 
     @Test func notChargingShowsSystemDraw() {
-        var s = snapshot(charging: false, input: 35, battery: -1)
+        var s = snapshot(charging: false, battery: -1)
         #expect(s.powerDisplay == .consuming(watts: 30))
         s.power?.systemLoadWatts = nil
         s.energy = EnergyReading(systemWatts: 38)
@@ -148,5 +145,35 @@ struct LiveStoreTests {
         #expect(store.recent(.cpuTemperature, count: 5) == [1, 2, 3])
         #expect(store.recent(.cpu, count: 2) == [nil, nil])
         #expect(store.latest?.cpuTemperature == 3)
+    }
+
+    @Test func mirrorsHistoryAndLatestWithoutSharingFutureIngests() {
+        let source = LiveStore(capacity: 3)
+        let mirror = LiveStore(capacity: 3)
+        for i in 0..<2 {
+            var snapshot = Snapshot(date: Date(timeIntervalSince1970: Double(i)))
+            snapshot.cpuTemperature = Double(i)
+            snapshot.gpuTemperature = Double(i * 10)
+            source.ingest(snapshot)
+        }
+
+        let latest = source.latest
+        let cpuHistory = source.recent(.cpuTemperature, count: 3)
+        let gpuHistory = source.recent(.gpuTemperature, count: 3)
+        mirror.mirror(source)
+
+        #expect(mirror.latest == latest)
+        #expect(mirror.recent(.cpuTemperature, count: 3) == cpuHistory)
+        #expect(mirror.recent(.gpuTemperature, count: 3) == gpuHistory)
+
+        var next = Snapshot(date: Date(timeIntervalSince1970: 2))
+        next.cpuTemperature = 99
+        next.gpuTemperature = 100
+        source.ingest(next)
+
+        #expect(source.latest == next)
+        #expect(mirror.latest == latest)
+        #expect(mirror.recent(.cpuTemperature, count: 3) == cpuHistory)
+        #expect(mirror.recent(.gpuTemperature, count: 3) == gpuHistory)
     }
 }

@@ -16,16 +16,18 @@ final class MenuBarRenderer {
 
     enum Tint: Hashable {
         case normal
-        case alert
         case good
-        case caution
 
         var color: NSColor? {
             switch self {
             case .normal: nil
-            case .alert: .systemRed
-            case .good: .systemGreen
-            case .caution: .systemYellow
+            case .good:
+                NSColor(name: NSColor.Name("NadiChargingGreen"), dynamicProvider: { appearance in
+                    if appearance.bestMatch(from: [.aqua, .darkAqua]) == .aqua {
+                        return NSColor(red: 26 / 255.0, green: 107 / 255.0, blue: 47 / 255.0, alpha: 1)
+                    }
+                    return .systemGreen
+                })
             }
         }
     }
@@ -70,7 +72,10 @@ final class MenuBarRenderer {
 
         let template = items.allSatisfy { $0.tint == .normal }
         NSGraphicsContext.saveGraphicsState()
-        NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
+        let context = NSGraphicsContext(bitmapImageRep: rep)
+        NSGraphicsContext.current = context
+        NSColor.clear.setFill()
+        NSRect(origin: .zero, size: size).fill()
         appearance.performAsCurrentDrawingAppearance {
             var x: CGFloat = 0
             for (item, w) in zip(items, widths) {
@@ -154,8 +159,7 @@ final class MenuBarRenderer {
 
     private func drawBars(_ samples: [Double?], at x: CGFloat, height: CGFloat, color: NSColor) {
         let rect = graphRect(at: x, height: height)
-        color.withAlphaComponent(0.18).setFill()
-        rect.fill()
+        drawBaseline(in: rect, color: color)
         color.setFill()
         let bars = samples.suffix(Self.sampleCount)
         // Right-align so the newest sample sits next to the value.
@@ -170,8 +174,7 @@ final class MenuBarRenderer {
 
     private func drawLine(_ samples: [Double?], at x: CGFloat, height: CGFloat, color: NSColor) {
         let rect = graphRect(at: x, height: height)
-        color.withAlphaComponent(0.18).setFill()
-        rect.fill()
+        drawBaseline(in: rect, color: color)
         let points = samples.suffix(Self.sampleCount)
         let step = rect.width / CGFloat(Self.sampleCount - 1)
         let path = NSBezierPath()
@@ -194,6 +197,11 @@ final class MenuBarRenderer {
         path.stroke()
     }
 
+    private func drawBaseline(in rect: NSRect, color: NSColor) {
+        color.withAlphaComponent(0.45).setFill()
+        NSRect(x: rect.minX, y: rect.minY, width: rect.width, height: 0.75).fill()
+    }
+
     private func width(_ text: String, font: NSFont) -> CGFloat {
         (text as NSString).size(withAttributes: [.font: font]).width
     }
@@ -211,7 +219,6 @@ extension MenuBarRenderer.Item {
         // Quantize so changes too small to move a pixel do not trigger a redraw.
         let quantized = samples.map { $0.map { ($0 * 26).rounded() / 26 } }
         let formatted = MetricFormatter.format(value, for: metric, temperatureUnit: temperatureUnit)
-        let tint: MenuBarRenderer.Tint = metric.isAlerting(value) ? .alert : .normal
 
         switch metric {
         case .power:
@@ -224,19 +231,19 @@ extension MenuBarRenderer.Item {
         case .memory, .cpuTemperature, .gpuTemperature, .fan, .cpuPower, .gpuPower, .networkIn, .networkOut,
              .diskRead, .diskWrite:
             self.init(label: metric.label, widestLabel: metric.label, value: formatted,
-                      widestValue: metric.widestValue, graph: .line(quantized), tint: tint)
+                      widestValue: metric.widestValue, graph: .line(quantized), tint: .normal)
         case .cpu, .gpu:
             self.init(label: metric.label, widestLabel: metric.label, value: formatted,
-                      widestValue: metric.widestValue, graph: .bars(quantized), tint: tint)
+                      widestValue: metric.widestValue, graph: .bars(quantized), tint: .normal)
         }
     }
 
-    /// Battery charge watts while charging (green, or yellow when slow), whole-system draw otherwise (D21).
+    /// Battery charge watts while charging (green), whole-system draw otherwise (D21).
     private static func power(_ display: PowerDisplay?) -> Self {
         switch display {
-        case .charging(let watts, let slow):
+        case .charging(let watts):
             Self(label: "Chg", widestLabel: "Chg", value: MetricFormatter.watts(watts), widestValue: "100W",
-                 graph: .none, tint: slow ? .caution : .good)
+                 graph: .none, tint: .good)
         case .consuming(let watts):
             Self(label: "Use", widestLabel: "Chg", value: watts.map(MetricFormatter.watts) ?? MetricFormatter.missing,
                  widestValue: "100W", graph: .none, tint: .normal)
@@ -266,8 +273,7 @@ extension MenuBarRenderer.Item {
         default:
             switch tint {
             case .good: "Charging \(value)"
-            case .caution: "Charging slowly \(value)"
-            default: "\(label) \(value)"
+            case .normal: "\(label) \(value)"
             }
         }
     }

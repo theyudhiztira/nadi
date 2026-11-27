@@ -5,8 +5,41 @@ public enum TemperatureUnit: String, Sendable, Codable {
     case fahrenheit
 }
 
+public struct Reading: Sendable, Equatable {
+    public var number: String
+    public var unit: String
+    public var spaced: Bool
+
+    public init(number: String, unit: String, spaced: Bool) {
+        self.number = number
+        self.unit = unit
+        self.spaced = spaced
+    }
+}
+
 public enum MetricFormatter {
     public static let missing = "--"
+
+    /// Splits an already formatted value into its number and unit.
+    public static func reading(_ formatted: String) -> Reading {
+        let prefix = String(formatted.prefix { $0.isNumber || "+-.,".contains($0) })
+        guard prefix.contains(where: \.isNumber) else { return Reading(number: formatted, unit: "", spaced: false) }
+        let remainder = formatted.dropFirst(prefix.count)
+        let unit = String(remainder.drop(while: \.isWhitespace))
+        return Reading(
+            number: prefix,
+            unit: unit,
+            spaced: !unit.isEmpty && remainder.first?.isWhitespace == true
+        )
+    }
+
+    public static func reading(
+        _ value: Double?,
+        for metric: MetricID,
+        temperatureUnit: TemperatureUnit = .celsius
+    ) -> Reading {
+        reading(format(value, for: metric, temperatureUnit: temperatureUnit))
+    }
 
     public static func format(_ value: Double?, for metric: MetricID, temperatureUnit: TemperatureUnit = .celsius) -> String {
         guard let value, value.isFinite else { return missing }

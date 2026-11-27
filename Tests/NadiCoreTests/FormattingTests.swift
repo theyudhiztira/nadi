@@ -25,6 +25,28 @@ struct FormattingTests {
         #expect(MetricFormatter.format(1_500_000, for: .networkIn) == "1.5 MB/s")
     }
 
+    @Test func readingsSplitNumberAndUnit() {
+        let cases: [(String, String, String, Bool)] = [
+            ("22%", "22", "%", false),
+            ("56°", "56", "°", false),
+            ("17W", "17", "W", false),
+            ("4.2W", "4.2", "W", false),
+            ("3.6 KB/s", "3.6", "KB/s", true),
+            ("137 GB free", "137", "GB free", true),
+            ("1,630 rpm", "1,630", "rpm", true),
+            ("-18.9W", "-18.9", "W", false),
+            ("+2.0W", "+2.0", "W", false),
+            ("2.7k", "2.7", "k", false),
+            ("--", "--", "", false),
+            ("", "", "", false),
+        ]
+        for (formatted, number, unit, spaced) in cases {
+            let reading = MetricFormatter.reading(formatted)
+            #expect(reading == Reading(number: number, unit: unit, spaced: spaced))
+        }
+        #expect(MetricFormatter.reading(0.22, for: .cpu) == Reading(number: "22", unit: "%", spaced: false))
+    }
+
     @Test func missingValue() {
         #expect(MetricFormatter.format(nil, for: .cpu) == "--")
         #expect(MetricFormatter.format(.nan, for: .power) == "--")

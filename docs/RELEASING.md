@@ -19,7 +19,7 @@ Why a ZIP and not a DMG: on macOS 27, Finder refuses to copy an app that Apple h
    ```
 
 5. The Release workflow checks that the tag matches `Info.plist`, runs the tests, builds `Nadi-0.1.0.zip` with its `.sha256` file, and opens a draft release. Versions starting with `0.` are marked as pre-releases.
-6. On GitHub, open the draft under Releases. Paste the version's CHANGELOG entry into the notes, download the ZIP once and install it on a Mac, then click Publish release.
+6. On GitHub, open the draft under Releases. Paste the version's CHANGELOG entry into the notes, download the ZIP once and install it on a Mac, then click Publish release. The update notice only sees published releases, so drafts are ignored. Keep the ZIP named `Nadi-<version>.zip` so the Download button links to it.
 
 If the workflow fails before the draft exists, fix the problem, then move the tag to the fixed commit:
 

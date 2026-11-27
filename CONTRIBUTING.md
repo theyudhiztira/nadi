@@ -16,7 +16,7 @@ Nadi has only been tested on an M1 Max. If a metric shows a dash on your Mac, a 
 
 ## Propose a change
 
-For anything larger than a small fix, open an issue first so we can agree on the approach before you write code. Settings, history and alerts are already planned, so say in the issue if you want to take one of them.
+For anything larger than a small fix, open an issue first so we can agree on the approach before you write code. Settings and history are already planned, so say in the issue if you want to take one of them.
 
 ## Set up
 

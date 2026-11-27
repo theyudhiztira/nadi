@@ -57,23 +57,16 @@ public struct Snapshot: Sendable, Equatable {
 
 /// What the menu bar's power slot shows (D21).
 public enum PowerDisplay: Sendable, Equatable {
-    /// Watts going into the battery. Slow when the adapter delivers under 40% of its rating.
-    case charging(watts: Double, slow: Bool)
+    /// Watts going into the battery.
+    case charging(watts: Double)
     /// Whole-system draw.
     case consuming(watts: Double?)
-
-    /// Same threshold as the planned slow-charging alert.
-    public static let slowFraction = 0.4
 }
 
 extension Snapshot {
     public var powerDisplay: PowerDisplay {
         if let p = power, p.isCharging {
-            var slow = false
-            if let input = p.adapterInputWatts, let rating = p.adapterRatingWatts, rating > 0 {
-                slow = input < rating * PowerDisplay.slowFraction
-            }
-            return .charging(watts: max(p.batteryWatts ?? 0, 0), slow: slow)
+            return .charging(watts: max(p.batteryWatts ?? 0, 0))
         }
         // The battery's own SystemLoad comes with the power reading the slot already needs; the SMC figure is a fallback.
         return .consuming(watts: power?.systemLoadWatts ?? energy?.systemWatts)

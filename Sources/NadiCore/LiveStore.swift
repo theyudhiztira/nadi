@@ -20,6 +20,11 @@ public final class LiveStore {
         latest = snapshot
     }
 
+    public func mirror(_ other: LiveStore) {
+        history = other.history
+        latest = other.latest
+    }
+
     /// The newest `count` samples for a metric, oldest first.
     public func recent(_ metric: MetricID, count: Int) -> [Double?] {
         history[metric]?.suffix(count) ?? []

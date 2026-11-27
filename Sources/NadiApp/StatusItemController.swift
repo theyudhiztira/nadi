@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 import NadiCore
 
 @MainActor
@@ -6,7 +7,10 @@ final class StatusItemController {
     private let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private let renderer = MenuBarRenderer()
     private let store: LiveStore
+    private let panelStore = LiveStore()
     private let sampler: Sampler
+    private let keepAwake: KeepAwake
+    private let updateChecker: UpdateChecker
     private let loginItem = LoginItem()
     private var panel: StatusPanel?
     private var outsideClickMonitor: Any?
@@ -16,9 +20,11 @@ final class StatusItemController {
     private var appearanceObservation: NSKeyValueObservation?
     private var appearanceName: NSAppearance.Name?
 
-    init(store: LiveStore, sampler: Sampler) {
+    init(store: LiveStore, sampler: Sampler, keepAwake: KeepAwake, updateChecker: UpdateChecker) {
         self.store = store
         self.sampler = sampler
+        self.keepAwake = keepAwake
+        self.updateChecker = updateChecker
         if let button = item.button {
             button.imagePosition = .imageOnly
             button.target = self
@@ -27,7 +33,7 @@ final class StatusItemController {
         }
         render()
         observe()
-        // The pre-rendered bitmap bakes in colors when a value is alerting, so redraw on light/dark switches.
+        // The pre-rendered bitmap uses green for charging, so redraw on light/dark switches.
         // KVO also fires on unrelated button updates, so compare the light/dark match before redrawing.
         appearanceName = item.button?.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua])
         appearanceObservation = item.button?.observe(\.effectiveAppearance) { [weak self] button, _ in
@@ -40,6 +46,8 @@ final class StatusItemController {
                 self.render()
             }
         }
+        // Build the panel before a click can pay for SwiftUI's first layout.
+        DispatchQueue.main.async { [weak self] in self?.preparePanel() }
     }
 
     @objc private func togglePanel() {
@@ -47,16 +55,11 @@ final class StatusItemController {
     }
 
     private func showPanel() {
-        guard let buttonWindow = item.button?.window, let screen = buttonWindow.screen ?? NSScreen.main else { return }
-        let panel = self.panel ?? makePanel()
-        self.panel = panel
-
-        let visible = screen.visibleFrame
-        let height = min(760, visible.height - 12)
-        var x = buttonWindow.frame.midX - PanelView.width / 2
-        x = min(max(x, visible.minX + 6), visible.maxX - PanelView.width - 6)
-        panel.setFrame(NSRect(x: x, y: buttonWindow.frame.minY - 4 - height, width: PanelView.width, height: height), display: true)
+        guard let buttonWindow = item.button?.window, let screen = buttonWindow.screen ?? NSScreen.main, let panel else { return }
+        panelStore.mirror(store)
+        panel.setFrame(panelFrame(buttonWindow: buttonWindow, screen: screen), display: true)
         loginItem.refresh()
+        Task { await keepAwake.refresh() }
         panel.makeKeyAndOrderFront(nil)
         item.button?.highlight(true)
 
@@ -76,9 +79,39 @@ final class StatusItemController {
     }
 
     private func makePanel() -> StatusPanel {
-        let panel = StatusPanel(rootView: PanelView(store: store, loginItem: loginItem, onQuit: { NSApp.terminate(nil) }))
+        let panel = StatusPanel(rootView: makePanelView())
         panel.onCancel = { [weak self] in self?.closePanel() }
         return panel
+    }
+
+    private func preparePanel() {
+        guard panel == nil else { return }
+        let panel = makePanel()
+        self.panel = panel
+        if let screen = item.button?.window?.screen ?? NSScreen.main {
+            panel.setFrame(panelFrame(buttonWindow: item.button?.window, screen: screen), display: false)
+        }
+        panelStore.mirror(store)
+        panel.contentView?.layoutSubtreeIfNeeded()
+    }
+
+    private func panelFrame(buttonWindow: NSWindow?, screen: NSScreen) -> NSRect {
+        let visible = screen.visibleFrame
+        let height = min(760, visible.height - 12)
+        let buttonMidX = buttonWindow?.frame.midX ?? visible.midX
+        let x = min(max(buttonMidX - PanelView.width / 2, visible.minX + 6), visible.maxX - PanelView.width - 6)
+        let y = (buttonWindow?.frame.minY ?? visible.maxY) - 4 - height
+        return NSRect(x: x, y: y, width: PanelView.width, height: height)
+    }
+
+    private func makePanelView() -> PanelView {
+        PanelView(
+            store: panelStore,
+            loginItem: loginItem,
+            keepAwake: keepAwake,
+            updateChecker: updateChecker,
+            onQuit: { NSApp.terminate(nil) }
+        )
     }
 
     private func observe() {
@@ -86,8 +119,12 @@ final class StatusItemController {
             _ = store.latest
         } onChange: { [weak self] in
             Task { @MainActor in
-                self?.render()
-                self?.observe()
+                guard let self else { return }
+                if self.panel?.isVisible == true, let latest = self.store.latest {
+                    self.panelStore.ingest(latest)
+                }
+                self.render()
+                self.observe()
             }
         }
     }

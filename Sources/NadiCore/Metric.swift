@@ -35,18 +35,4 @@ public enum MetricID: String, CaseIterable, Sendable, Codable {
         case .network: "Net"
         }
     }
-
-    /// Placeholder until phase 7 brings user-set alert rules. Value in the metric's own unit.
-    public var defaultAlertThreshold: Double? {
-        switch self {
-        case .cpu, .memory: 0.9
-        case .cpuTemperature, .gpuTemperature: 90
-        default: nil
-        }
-    }
-
-    public func isAlerting(_ value: Double?) -> Bool {
-        guard let value, let threshold = defaultAlertThreshold else { return false }
-        return value >= threshold
-    }
 }

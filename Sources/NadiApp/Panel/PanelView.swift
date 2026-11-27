@@ -7,24 +7,73 @@ import SwiftUI
 struct PanelView: View {
     let store: LiveStore
     let loginItem: LoginItem
+    let keepAwake: KeepAwake
+    let updateChecker: UpdateChecker
     let onQuit: () -> Void
 
     var body: some View {
         VStack(spacing: 0) {
-            ScrollView {
-                PanelSections(store: store)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 12)
-            }
-            Divider()
-            LoginItemRow(loginItem: loginItem)
-            Divider()
-            PanelFooter(onQuit: onQuit)
+            PanelTopRows(
+                update: updateChecker.available,
+                currentVersion: currentVersion,
+                keepAwake: keepAwake
+            )
+            ScrollView { PanelSections(store: store) }
+            PanelBottomRows(loginItem: loginItem, onQuit: onQuit)
         }
         .frame(width: PanelView.width)
     }
 
+    private var currentVersion: String? {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
+    }
+
     static let width: CGFloat = 340
+}
+
+extension Color {
+    static let panelSecondary = Color(
+        NSColor(name: NSColor.Name("NadiPanelSecondary"), dynamicProvider: { appearance in
+            if appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua {
+                return NSColor(red: 172 / 255.0, green: 172 / 255.0, blue: 176 / 255.0, alpha: 1)
+            }
+            return NSColor(red: 94 / 255.0, green: 94 / 255.0, blue: 94 / 255.0, alpha: 1)
+        })
+    )
+}
+
+struct PanelTopRows: View {
+    let update: AvailableUpdate?
+    let currentVersion: String?
+    let keepAwake: KeepAwake
+
+    var body: some View {
+        VStack(spacing: 0) {
+            if let update, let currentVersion {
+                UpdateRow(update: update, currentVersion: currentVersion)
+            }
+            KeepAwakeRow(keepAwake: keepAwake)
+        }
+    }
+}
+
+struct PanelBottomRows: View {
+    let loginItem: LoginItem
+    let onQuit: () -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            LoginItemRow(loginItem: loginItem)
+            PanelFooter(onQuit: onQuit)
+        }
+        .padding(.horizontal, 14)
+        .padding(.top, 6)
+        .padding(.bottom, 6)
+        .overlay(alignment: .top) {
+            Color.primary.opacity(0.11).frame(height: 0.5)
+        }
+        .padding(.top, 16)
+    }
 }
 
 struct PanelSections: View {
@@ -33,82 +82,132 @@ struct PanelSections: View {
 
     var body: some View {
         let s = store.latest
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 0) {
             cpu(s)
-            Divider()
             memory(s)
-            Divider()
             temperatures(s)
-            Divider()
             gpu(s)
-            Divider()
             fans(s)
-            Divider()
             power(s)
-            Divider()
             network(s)
-            Divider()
             disk(s)
-            Divider()
             processes(s)
         }
+        .frame(maxWidth: .infinity)
     }
 
-    // MARK: Sections
-
     private func cpu(_ s: Snapshot?) -> some View {
-        PanelSection(title: "CPU", value: format(s?.cpu?.total, .cpu), alerting: MetricID.cpu.isAlerting(s?.cpu?.total)) {
-            HistoryChart(store: store, series: [.init(metric: .cpu, name: "CPU")], alerting: MetricID.cpu.isAlerting(s?.cpu?.total))
-            if let load = s?.cpu, let counts = CPUReader.coreCounts, counts.performance + counts.efficiency == load.perCore.count {
-                // Apple Silicon numbers efficiency cores first.
-                let columns = max(counts.efficiency, counts.performance)
-                CoreBars(title: "Efficiency", loads: Array(load.perCore.prefix(counts.efficiency)), columns: columns)
-                CoreBars(title: "Performance", loads: Array(load.perCore.suffix(counts.performance)), columns: columns)
-            } else if let load = s?.cpu {
-                CoreBars(title: "Cores", loads: load.perCore, columns: load.perCore.count)
+        PanelSection(title: "CPU", first: true) {
+            VStack(spacing: 0) {
+                HStack {
+                    LeadNumber(reading: MetricFormatter.reading(s?.cpu?.total, for: .cpu))
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, 14)
+                if let load = s?.cpu, let counts = CPUReader.coreCounts, counts.performance + counts.efficiency == load.perCore.count {
+                    // Apple Silicon numbers efficiency cores first.
+                    let columns = max(counts.efficiency, counts.performance)
+                    VStack(spacing: 4) {
+                        CoreBars(title: "Efficiency", loads: Array(load.perCore.prefix(counts.efficiency)), columns: columns)
+                        CoreBars(title: "Performance", loads: Array(load.perCore.suffix(counts.performance)), columns: columns)
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.top, 10)
+                } else if let load = s?.cpu {
+                    CoreBars(title: "Cores", loads: load.perCore, columns: load.perCore.count)
+                        .padding(.horizontal, 14)
+                        .padding(.top, 10)
+                }
+                HistoryChart(store: store, series: [.init(metric: .cpu, name: "CPU")])
+                    .frame(height: 46)
+                    .padding(.top, 10)
+                TimeAxis()
+                    .padding(.horizontal, 14)
+                    .padding(.top, 3)
             }
         }
     }
 
     private func memory(_ s: Snapshot?) -> some View {
         let m = s?.memory
-        return PanelSection(title: "Memory", value: format(m?.fraction, .memory), alerting: MetricID.memory.isAlerting(m?.fraction)) {
-            HistoryChart(store: store, series: [.init(metric: .memory, name: "Memory")], alerting: MetricID.memory.isAlerting(m?.fraction))
-            Facts([
-                ("Used", m.map { "\(MetricFormatter.bytes(Double($0.usedBytes), binary: true)) of \(MetricFormatter.bytes(Double($0.totalBytes), binary: true))" }),
-                ("Pressure", m?.pressure.map(\.label)),
-                ("Swap", m?.swapUsedBytes.map { MetricFormatter.bytes(Double($0), binary: true) }),
-            ])
+        return PanelSection(title: "Memory") {
+            VStack(spacing: 0) {
+                HStack(alignment: .bottom) {
+                    LeadNumber(reading: MetricFormatter.reading(m?.fraction, for: .memory))
+                    Spacer(minLength: 0)
+                    if let m {
+                        SideFact(label: "Used", value: "\(MetricFormatter.bytes(Double(m.usedBytes), binary: true)) of \(MetricFormatter.bytes(Double(m.totalBytes), binary: true))")
+                    }
+                }
+                .padding(.horizontal, 14)
+                HistoryChart(store: store, series: [.init(metric: .memory, name: "Memory")])
+                    .frame(height: 46)
+                    .padding(.top, 10)
+                Facts([
+                    ("Pressure", m?.pressure.map(\.label)),
+                    ("Swap", m?.swapUsedBytes.map { MetricFormatter.bytes(Double($0), binary: true) }),
+                ])
+                .padding(.horizontal, 14)
+                .padding(.top, 10)
+            }
         }
     }
 
     private func temperatures(_ s: Snapshot?) -> some View {
-        PanelSection(title: "Temperatures", value: format(s?.cpuTemperature, .cpuTemperature),
-                alerting: MetricID.cpuTemperature.isAlerting(s?.cpuTemperature)) {
-            HistoryChart(store: store, series: [.init(metric: .cpuTemperature, name: "CPU"), .init(metric: .gpuTemperature, name: "GPU")])
-            Facts([
-                ("CPU", Optional(format(s?.cpuTemperature, .cpuTemperature))),
-                ("GPU", Optional(format(s?.gpuTemperature, .gpuTemperature))),
-            ], legend: true)
+        PanelSection(title: "Temperatures") {
+            VStack(spacing: 0) {
+                HStack(alignment: .bottom, spacing: 18) {
+                    LeadNumber(reading: MetricFormatter.reading(s?.cpuTemperature, for: .cpuTemperature), label: "CPU", tint: .accentColor)
+                    LeadNumber(reading: MetricFormatter.reading(s?.gpuTemperature, for: .gpuTemperature), label: "GPU", tint: .panelSecondary, secondary: true)
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, 14)
+                HistoryChart(store: store, series: [.init(metric: .cpuTemperature, name: "CPU"), .init(metric: .gpuTemperature, name: "GPU")])
+                    .frame(height: 46)
+                    .padding(.top, 10)
+            }
         }
     }
 
     private func gpu(_ s: Snapshot?) -> some View {
-        PanelSection(title: "GPU", value: format(s?.gpuUsage, .gpu)) {
-            HistoryChart(store: store, series: [.init(metric: .gpu, name: "GPU")])
-            Facts([("Power", s?.energy?.gpuWatts.map(MetricFormatter.watts))])
+        PanelSection(title: "GPU") {
+            VStack(spacing: 0) {
+                HStack(alignment: .bottom) {
+                    LeadNumber(reading: MetricFormatter.reading(s?.gpuUsage, for: .gpu))
+                    Spacer(minLength: 0)
+                    SideFact(label: "Power", value: s?.energy?.gpuWatts.map(MetricFormatter.watts))
+                }
+                .padding(.horizontal, 14)
+                HistoryChart(store: store, series: [.init(metric: .gpu, name: "GPU")])
+                    .frame(height: 46)
+                    .padding(.top, 10)
+            }
         }
     }
 
     @ViewBuilder
     private func fans(_ s: Snapshot?) -> some View {
         let speeds = s?.fanRPM
-        PanelSection(title: "Fans", value: speeds?.max().map(rpm) ?? MetricFormatter.missing) {
-            if let speeds, speeds.isEmpty {
-                Note("This Mac has no fans.")
-            } else {
-                HistoryChart(store: store, series: [.init(metric: .fan, name: "Fan")])
-                Facts((speeds ?? []).enumerated().map { ("Fan \($0.offset + 1)", Optional(rpm($0.element))) })
+        PanelSection(title: "Fans") {
+            VStack(spacing: 0) {
+                HStack {
+                    LeadNumber(reading: MetricFormatter.reading(speeds?.max().map(rpm) ?? MetricFormatter.missing))
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, 14)
+                if let speeds, speeds.isEmpty {
+                    Note("This Mac has no fans.")
+                        .frame(height: 46)
+                        .padding(.horizontal, 14)
+                        .padding(.top, 10)
+                } else {
+                    HistoryChart(store: store, series: [.init(metric: .fan, name: "Fan")])
+                        .frame(height: 46)
+                        .padding(.top, 10)
+                    Facts(speeds.map { $0.enumerated().map { ("Fan \($0.offset + 1)", Optional(rpm($0.element))) } } ?? [])
+                        .padding(.horizontal, 14)
+                        .padding(.top, 10)
+                }
             }
         }
     }
@@ -116,51 +215,86 @@ struct PanelSections: View {
     @ViewBuilder
     private func power(_ s: Snapshot?) -> some View {
         let p = s?.power
-        PanelSection(title: "Power & Battery", value: format(p?.menuBarWatts, .power)) {
-            if store.latest != nil, p == nil {
-                Note("No battery found.")
-            } else {
-                HistoryChart(store: store, series: [.init(metric: .power, name: p?.externalConnected == false ? "System draw" : "Adapter input")])
-                Facts([
-                    (p?.externalConnected == false ? "System draw" : "Adapter input", p?.menuBarWatts.map(MetricFormatter.watts)),
-                    ("Adapter rating", p?.externalConnected == true ? p?.adapterRatingWatts.map(MetricFormatter.watts) : nil),
-                    ("Battery", p?.batteryWatts.map { String(format: "%+.1fW", $0) }),
-                    ("CPU", s?.energy?.cpuWatts.map(MetricFormatter.watts)),
-                    ("Whole system", s?.energy?.systemWatts.map(MetricFormatter.watts)),
-                    ("Charge", p?.percent.map { "\($0)%" }),
-                    ("State", p.map(chargeState)),
-                    (p?.isCharging == true ? "Time to full" : "Time left", p?.timeRemainingMinutes.map(duration)),
-                    ("Health", p?.healthFraction.map { "\(Int(($0 * 100).rounded()))%" }),
-                    ("Cycles", p?.cycleCount.map(String.init)),
-                ])
+        PanelSection(title: "Power & Battery") {
+            VStack(spacing: 0) {
+                HStack(alignment: .bottom) {
+                    LeadNumber(
+                        reading: MetricFormatter.reading(p?.menuBarWatts, for: .power),
+                        label: p?.externalConnected == false ? "System draw" : "Adapter input"
+                    )
+                    Spacer(minLength: 0)
+                    SideFact(label: "Charge", value: p?.percent.map { "\($0)%" })
+                }
+                .padding(.horizontal, 14)
+                if store.latest != nil, p == nil {
+                    Note("No battery found.")
+                        .frame(height: 46)
+                        .padding(.horizontal, 14)
+                        .padding(.top, 10)
+                } else {
+                    HistoryChart(store: store, series: [.init(metric: .power, name: p?.externalConnected == false ? "System draw" : "Adapter input")])
+                        .frame(height: 46)
+                        .padding(.top, 10)
+                    Facts([
+                        ("Adapter rating", p?.externalConnected == true ? p?.adapterRatingWatts.map(MetricFormatter.watts) : nil),
+                        ("Battery", p?.batteryWatts.map { String(format: "%+.1fW", $0) }),
+                        ("CPU", s?.energy?.cpuWatts.map(MetricFormatter.watts)),
+                        ("Whole system", s?.energy?.systemWatts.map(MetricFormatter.watts)),
+                        ("State", p.map(chargeState)),
+                        (p?.isCharging == true ? "Time to full" : "Time left", p?.timeRemainingMinutes.map(duration)),
+                        ("Health", p?.healthFraction.map { "\(Int(($0 * 100).rounded()))%" }),
+                        ("Cycles", p?.cycleCount.map(String.init)),
+                    ])
+                    .padding(.horizontal, 14)
+                    .padding(.top, 10)
+                }
             }
         }
     }
 
     private func network(_ s: Snapshot?) -> some View {
-        PanelSection(title: "Network", value: nil) {
-            HistoryChart(store: store, series: [.init(metric: .networkIn, name: "Down"), .init(metric: .networkOut, name: "Up")])
-            Facts([
-                ("Down", s?.network.map { MetricFormatter.bytesPerSecond($0.inPerSecond) }),
-                ("Up", s?.network.map { MetricFormatter.bytesPerSecond($0.outPerSecond) }),
-            ], legend: true)
+        PanelSection(title: "Network") {
+            VStack(spacing: 0) {
+                HStack(alignment: .bottom, spacing: 18) {
+                    LeadNumber(reading: MetricFormatter.reading(s?.network.map { $0.inPerSecond }, for: .networkIn), label: "Down", tint: .accentColor)
+                    LeadNumber(reading: MetricFormatter.reading(s?.network.map { $0.outPerSecond }, for: .networkOut), label: "Up", tint: .panelSecondary, secondary: true)
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, 14)
+                HistoryChart(store: store, series: [.init(metric: .networkIn, name: "Down"), .init(metric: .networkOut, name: "Up")])
+                    .frame(height: 46)
+                    .padding(.top, 10)
+            }
         }
     }
 
     private func disk(_ s: Snapshot?) -> some View {
-        PanelSection(title: "Disk", value: s?.diskFreeBytes.map { "\(MetricFormatter.bytes(Double($0))) free" }) {
-            HistoryChart(store: store, series: [.init(metric: .diskRead, name: "Read"), .init(metric: .diskWrite, name: "Write")])
-            Facts([
-                ("Read", s?.disk.map { MetricFormatter.bytesPerSecond($0.inPerSecond) }),
-                ("Write", s?.disk.map { MetricFormatter.bytesPerSecond($0.outPerSecond) }),
-            ], legend: true)
+        PanelSection(title: "Disk") {
+            VStack(spacing: 0) {
+                HStack {
+                    LeadNumber(reading: MetricFormatter.reading(s?.diskFreeBytes.map { "\(MetricFormatter.bytes(Double($0))) free" } ?? MetricFormatter.missing))
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, 14)
+                HistoryChart(store: store, series: [.init(metric: .diskRead, name: "Read"), .init(metric: .diskWrite, name: "Write")])
+                    .frame(height: 46)
+                    .padding(.top, 10)
+                Facts([
+                    ("Read", s?.disk.map { MetricFormatter.bytesPerSecond($0.inPerSecond) }),
+                    ("Write", s?.disk.map { MetricFormatter.bytesPerSecond($0.outPerSecond) }),
+                ], legend: true)
+                .padding(.horizontal, 14)
+                .padding(.top, 10)
+            }
         }
     }
 
     private func processes(_ s: Snapshot?) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 4) {
             HStack {
-                Text("Top processes").font(.system(size: 13, weight: .semibold))
+                Text("Top processes")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Color.panelSecondary)
                 Spacer()
                 Picker("Sort by", selection: $ranking) {
                     Text("CPU").tag(ProcessRanking.cpu)
@@ -168,32 +302,36 @@ struct PanelSections: View {
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
+                .controlSize(.small)
                 .fixedSize()
             }
             if let usage = s?.processes {
                 let top = TopProcesses.top(5, of: usage, by: ranking)
                 ForEach(top) { process in
                     HStack {
-                        Text(process.name).lineLimit(1).truncationMode(.middle)
+                        Text(process.name)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .layoutPriority(1)
                         Spacer()
                         Text(ranking == .cpu
                              ? "\(Int((process.cpu * 100).rounded()))%"
                              : MetricFormatter.bytes(Double(process.memoryBytes), binary: true))
                             .monospacedDigit()
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.panelSecondary)
+                            .fixedSize()
                     }
                     .font(.system(size: 12))
+                    .frame(height: 21)
                 }
             } else {
                 Note("Measuring processes…")
             }
         }
-    }
-
-    // MARK: Helpers
-
-    private func format(_ value: Double?, _ metric: MetricID) -> String {
-        MetricFormatter.format(value, for: metric)
+        .padding(.horizontal, 14)
+        .padding(.top, 20)
+        .accessibilityElement(children: .contain)
     }
 
     private func rpm(_ value: Double) -> String {
@@ -214,22 +352,18 @@ struct PanelSections: View {
 
 private struct PanelSection<Content: View>: View {
     let title: String
-    let value: String?
-    var alerting = false
+    var first = false
     @ViewBuilder let content: Content
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(title).font(.system(size: 13, weight: .semibold))
-                Spacer()
-                if let value {
-                    Text(value)
-                        .font(.system(size: 15, weight: .semibold))
-                        .monospacedDigit()
-                        .foregroundStyle(alerting ? Color.red : Color.primary)
-                }
-            }
+        VStack(alignment: .leading, spacing: 0) {
+            Text(title)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(Color.panelSecondary)
+                .frame(height: 18, alignment: .leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 14)
+                .padding(.top, first ? 16 : 20)
             content
         }
         .accessibilityElement(children: .contain)
@@ -249,25 +383,100 @@ private struct Facts: View {
 
     var body: some View {
         let visible = rows.enumerated().filter { $0.element.1 != nil }
-        Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 3) {
+        LazyVGrid(
+            columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3),
+            alignment: .leading,
+            spacing: 8
+        ) {
             ForEach(visible, id: \.offset) { entry in
-                GridRow {
+                VStack(alignment: .leading, spacing: 1) {
                     HStack(spacing: 5) {
                         if legend {
                             Circle()
-                                .fill(entry.offset == 0 ? Color.accentColor : Color.secondary)
+                                .fill(entry.offset == 0 ? Color.accentColor : Color.panelSecondary)
                                 .frame(width: 6, height: 6)
                         }
-                        Text(entry.element.0).foregroundStyle(.secondary)
+                        Text(entry.element.0)
+                            .foregroundStyle(Color.panelSecondary)
                     }
+                    .font(.system(size: 11))
                     Text(entry.element.1 ?? "")
+                        .font(.system(size: 13))
                         .monospacedDigit()
-                        .gridColumnAlignment(.trailing)
-                        .frame(maxWidth: .infinity, alignment: .trailing)
                 }
-                .font(.system(size: 12))
             }
         }
+    }
+}
+
+private struct LeadNumber: View {
+    let reading: Reading
+    var label: String? = nil
+    var tint: Color? = nil
+    var secondary = false
+
+    private var value: String { reading.number + (reading.spaced ? " " : "") + reading.unit }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 1) {
+            HStack(alignment: .firstTextBaseline, spacing: reading.spaced ? 3 : 1) {
+                Text(reading.number)
+                    .font(.system(size: secondary ? 20 : 28, weight: .semibold))
+                    .monospacedDigit()
+                    .tracking(secondary ? 0 : -0.2)
+                if !reading.unit.isEmpty {
+                    Text(reading.unit)
+                        .font(.system(
+                            size: reading.unit == "°" ? (secondary ? 20 : 28) : (secondary ? 13 : 15),
+                            weight: reading.unit == "°" ? .semibold : .medium
+                        ))
+                        .monospacedDigit()
+                }
+            }
+            if let label {
+                HStack(spacing: tint == nil ? 0 : 5) {
+                    if let tint {
+                        Circle().fill(tint).frame(width: 6, height: 6)
+                    }
+                    Text(label)
+                        .font(.system(size: 11))
+                        .foregroundStyle(Color.panelSecondary)
+                }
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel([label, value].compactMap { $0 }.joined(separator: " "))
+    }
+}
+
+private struct SideFact: View {
+    let label: String
+    let value: String?
+
+    var body: some View {
+        if let value {
+            VStack(alignment: .trailing, spacing: 1) {
+                Text(label)
+                    .font(.system(size: 11))
+                    .foregroundStyle(Color.panelSecondary)
+                Text(value)
+                    .font(.system(size: 13))
+                    .monospacedDigit()
+            }
+            .multilineTextAlignment(.trailing)
+        }
+    }
+}
+
+private struct TimeAxis: View {
+    var body: some View {
+        HStack {
+            Text("10 min ago")
+            Spacer()
+            Text("now")
+        }
+        .font(.system(size: 11))
+        .foregroundStyle(Color.panelSecondary)
     }
 }
 
@@ -281,8 +490,8 @@ private struct CoreBars: View {
         HStack(alignment: .bottom, spacing: 8) {
             Text(title)
                 .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-                .frame(width: 76, alignment: .leading)
+                .foregroundStyle(Color.panelSecondary)
+                .frame(width: 70, alignment: .leading)
             // Every row splits the width into the same number of columns, so two efficiency
             // cores and eight performance cores read at the same scale; unused columns stay empty.
             HStack(alignment: .bottom, spacing: 3) {
@@ -290,10 +499,10 @@ private struct CoreBars: View {
                     Group {
                         if i < loads.count {
                             ZStack(alignment: .bottom) {
-                                RoundedRectangle(cornerRadius: 1.5).fill(Color.secondary.opacity(0.2))
-                                RoundedRectangle(cornerRadius: 1.5)
+                                RoundedRectangle(cornerRadius: 1).fill(Color.primary.opacity(0.09))
+                                RoundedRectangle(cornerRadius: 1)
                                     .fill(Color.accentColor)
-                                    .frame(height: max(1, 18 * loads[i]))
+                                    .frame(height: max(1, 20 * loads[i]))
                             }
                             .onHover { inside in
                                 if inside { hovered = i } else if hovered == i { hovered = nil }
@@ -303,7 +512,7 @@ private struct CoreBars: View {
                         }
                     }
                     .frame(maxWidth: .infinity)
-                    .frame(height: 18)
+                    .frame(height: 20)
                     // Drawn by hand: the panel never activates the app, so system tooltips from .help() don't appear.
                     .overlay(alignment: .top) {
                         if hovered == i, i < loads.count {
@@ -332,7 +541,82 @@ private struct Note: View {
     init(_ text: String) { self.text = text }
 
     var body: some View {
-        Text(text).font(.system(size: 12)).foregroundStyle(.secondary)
+        Text(text)
+            .font(.system(size: 11))
+            .foregroundStyle(Color.panelSecondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct UpdateRow: View {
+    let update: AvailableUpdate
+    let currentVersion: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            (Text("Nadi \(update.version) is out. ").fontWeight(.semibold)
+             + Text("You have \(currentVersion).").fontWeight(.regular))
+                .font(.system(size: 12))
+            HStack(spacing: 6) {
+                Button("Download") { NSWorkspace.shared.open(update.downloadURL) }
+                    .buttonStyle(.bordered)
+                Button("Release notes") { NSWorkspace.shared.open(update.pageURL) }
+                    .buttonStyle(.bordered)
+            }
+            .font(.system(size: 11))
+            .padding(.top, 7)
+        }
+        .controlSize(.small)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .overlay(alignment: .bottom) {
+            Color.primary.opacity(0.11).frame(height: 0.5)
+        }
+    }
+}
+
+private struct KeepAwakeRow: View {
+    let keepAwake: KeepAwake
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text("Keep awake with lid closed")
+                    .font(.system(size: 13))
+                Spacer()
+                Toggle(
+                    "Keep awake with lid closed",
+                    isOn: Binding(
+                        get: { keepAwake.isEnabled },
+                        set: { value in Task { await keepAwake.setEnabled(value) } }
+                    )
+                )
+                .toggleStyle(.switch)
+                .labelsHidden()
+                .disabled(keepAwake.isBusy)
+            }
+            if let note {
+                Text(note)
+                    .font(.system(size: 11))
+                    .foregroundStyle(Color.panelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .controlSize(.small)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .overlay(alignment: .bottom) {
+            Color.primary.opacity(0.11).frame(height: 0.5)
+        }
+    }
+
+    private var note: String? {
+        if let error = keepAwake.error { return "Could not change it: \(error)" }
+        if keepAwake.isEnabled { return "Sleep is off, on battery too. Don't carry the Mac in a bag like this." }
+        if !keepAwake.isAuthorized { return "The first time, macOS asks for your password." }
+        return nil
     }
 }
 
@@ -350,16 +634,15 @@ private struct LoginItemRow: View {
                     Button("Open Login Items") { loginItem.openLoginItemsSettings() }
                 }
             }
+            .frame(height: 24)
             if let note {
                 Text(note)
                     .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.panelSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
         .controlSize(.small)
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
     }
 
     private var note: String? {
@@ -378,20 +661,19 @@ private struct PanelFooter: View {
             Button("Settings") {}
                 .disabled(true)
             Text("Coming soon")
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.panelSecondary)
             Spacer()
             // Selectable so a bug report can paste it.
             Text(Self.version)
                 .font(.system(size: 11).monospacedDigit())
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.panelSecondary)
                 .textSelection(.enabled)
             Button("Quit Nadi", action: onQuit)
                 .keyboardShortcut("q")
         }
+        .font(.system(size: 11))
+        .frame(height: 28)
         .controlSize(.small)
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
     }
 
     /// "v0.0.1 (1)" from Info.plist. A bare binary outside Nadi.app has no Info.plist.
