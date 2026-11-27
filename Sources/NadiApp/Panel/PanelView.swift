@@ -196,7 +196,7 @@ struct PanelSections: View {
                 }
                 .padding(.horizontal, 14)
                 if let speeds, speeds.isEmpty {
-                    Note("This Mac has no fans.")
+                    Note("No fans")
                         .frame(height: 46)
                         .padding(.horizontal, 14)
                         .padding(.top, 10)
@@ -215,31 +215,31 @@ struct PanelSections: View {
     @ViewBuilder
     private func power(_ s: Snapshot?) -> some View {
         let p = s?.power
-        PanelSection(title: "Power & Battery") {
+        PanelSection(title: "Power") {
             VStack(spacing: 0) {
                 HStack(alignment: .bottom) {
                     LeadNumber(
                         reading: MetricFormatter.reading(p?.menuBarWatts, for: .power),
-                        label: p?.externalConnected == false ? "System draw" : "Adapter input"
+                        label: p?.externalConnected == false ? "System" : "Adapter"
                     )
                     Spacer(minLength: 0)
                     SideFact(label: "Charge", value: p?.percent.map { "\($0)%" })
                 }
                 .padding(.horizontal, 14)
                 if store.latest != nil, p == nil {
-                    Note("No battery found.")
+                    Note("No battery")
                         .frame(height: 46)
                         .padding(.horizontal, 14)
                         .padding(.top, 10)
                 } else {
-                    HistoryChart(store: store, series: [.init(metric: .power, name: p?.externalConnected == false ? "System draw" : "Adapter input")])
+                    HistoryChart(store: store, series: [.init(metric: .power, name: p?.externalConnected == false ? "System" : "Adapter")])
                         .frame(height: 46)
                         .padding(.top, 10)
                     Facts([
-                        ("Adapter rating", p?.externalConnected == true ? p?.adapterRatingWatts.map(MetricFormatter.watts) : nil),
+                        ("Rated", p?.externalConnected == true ? p?.adapterRatingWatts.map(MetricFormatter.watts) : nil),
                         ("Battery", p?.batteryWatts.map { String(format: "%+.1fW", $0) }),
                         ("CPU", s?.energy?.cpuWatts.map(MetricFormatter.watts)),
-                        ("Whole system", s?.energy?.systemWatts.map(MetricFormatter.watts)),
+                        ("System", s?.energy?.systemWatts.map(MetricFormatter.watts)),
                         ("State", p.map(chargeState)),
                         (p?.isCharging == true ? "Time to full" : "Time left", p?.timeRemainingMinutes.map(duration)),
                         ("Health", p?.healthFraction.map { "\(Int(($0 * 100).rounded()))%" }),
@@ -292,7 +292,7 @@ struct PanelSections: View {
     private func processes(_ s: Snapshot?) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
-                Text("Top processes")
+                Text("Processes")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(Color.panelSecondary)
                 Spacer()
@@ -308,7 +308,12 @@ struct PanelSections: View {
             if let usage = s?.processes {
                 let top = TopProcesses.top(5, of: usage, by: ranking)
                 ForEach(top) { process in
-                    HStack {
+                    HStack(spacing: 6) {
+                        Image(nsImage: ProcessIcon.icon(for: process.pid, name: process.name))
+                            .resizable()
+                            .interpolation(.high)
+                            .frame(width: 16, height: 16)
+                            .accessibilityHidden(true)
                         Text(process.name)
                             .lineLimit(1)
                             .truncationMode(.middle)
@@ -326,7 +331,7 @@ struct PanelSections: View {
                     .frame(height: 21)
                 }
             } else {
-                Note("Measuring processes…")
+                Note("Measuring…")
             }
         }
         .padding(.horizontal, 14)
@@ -631,7 +636,7 @@ private struct LoginItemRow: View {
                     .disabled(!loginItem.isAvailable || loginItem.needsApproval)
                 Spacer()
                 if loginItem.needsApproval {
-                    Button("Open Login Items") { loginItem.openLoginItemsSettings() }
+                    Button("Login Items…") { loginItem.openLoginItemsSettings() }
                 }
             }
             .frame(height: 24)
@@ -646,9 +651,9 @@ private struct LoginItemRow: View {
     }
 
     private var note: String? {
-        if !loginItem.isAvailable { return "Only works when Nadi runs from Nadi.app." }
-        if loginItem.needsApproval { return "Nadi is turned off in Login Items. Turn it back on there." }
-        return loginItem.error.map { "Could not change it: \($0)" }
+        if !loginItem.isAvailable { return "Requires Nadi.app." }
+        if loginItem.needsApproval { return "Disabled in Login Items." }
+        return loginItem.error
     }
 }
 
@@ -660,15 +665,13 @@ private struct PanelFooter: View {
             // TODO(phase 6): open the settings window.
             Button("Settings") {}
                 .disabled(true)
-            Text("Coming soon")
-                .foregroundStyle(Color.panelSecondary)
             Spacer()
             // Selectable so a bug report can paste it.
             Text(Self.version)
                 .font(.system(size: 11).monospacedDigit())
                 .foregroundStyle(Color.panelSecondary)
                 .textSelection(.enabled)
-            Button("Quit Nadi", action: onQuit)
+            Button("Quit", action: onQuit)
                 .keyboardShortcut("q")
         }
         .font(.system(size: 11))
